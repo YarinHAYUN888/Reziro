@@ -1,7 +1,7 @@
 import type { AppState } from '../types/models';
 import type { StorageAdapter } from './LocalStorageAdapter';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { loadAppState, saveAppState } from './supabaseService';
+import { loadState, saveState } from './supabaseSync';
 
 function getEmptyState(): AppState {
   return {
@@ -26,12 +26,7 @@ export class SupabaseAdapter implements StorageAdapter {
       console.warn('SupabaseAdapter.loadState: Supabase not configured (missing env).');
       return getEmptyState();
     }
-    try {
-      return await loadAppState();
-    } catch (err) {
-      console.error('SupabaseAdapter.loadState failed:', err);
-      return getEmptyState();
-    }
+    return loadState();
   }
 
   async saveState(state: AppState): Promise<void> {
@@ -42,7 +37,7 @@ export class SupabaseAdapter implements StorageAdapter {
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => {
       this.saveTimeout = null;
-      saveAppState(state).catch((err) => console.error('SupabaseAdapter.saveState failed:', err));
+      saveState(state).catch((err) => console.error('SupabaseAdapter.saveState failed:', err));
     }, this.debounceMs);
   }
 }
