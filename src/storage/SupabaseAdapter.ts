@@ -39,10 +39,14 @@ export class SupabaseAdapter implements StorageAdapter {
     this.saveTimeout = setTimeout(() => {
       this.saveTimeout = null;
       saveState(state).catch((err) => {
+        const msg = typeof err === 'object' && err && 'message' in err
+          ? String((err as Error).message)
+          : String(err ?? '');
+        const isSchemaOrDbError = /room_financials|schema cache|column.*does not exist|could not find.*column|column.*in the schema/i.test(msg);
         console.error('SupabaseAdapter.saveState failed:', err);
-        const msg = typeof err === 'object' && err && 'message' in err ? String((err as Error).message) : '';
-        const isSchemaError = /schema cache|column.*does not exist|could not find.*column/i.test(msg);
-        toast.error(isSchemaError ? 'Failed to save. Please refresh the page.' : (msg || 'Failed to save'));
+        if (!isSchemaOrDbError) {
+          toast.error(msg || 'Failed to save');
+        }
       });
     }, this.debounceMs);
   }
