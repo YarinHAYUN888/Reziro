@@ -188,29 +188,31 @@ export function Costs() {
                 {roomCosts.map((cost) => (
                   <div
                     key={cost.id}
-                    className="glass-card border-primary/20 p-4 rounded-xl hover:border-primary/30 transition-all duration-200 group relative"
+                    className="glass-card border-primary/20 p-4 rounded-xl hover:border-primary/30 transition-all duration-200 group"
                   >
-                    <div className="absolute top-2 right-2 rtl:right-auto rtl:left-2 z-10 flex gap-2">
-                      <button
-                        onClick={() => handleOpenRoomCostEdit(cost)}
-                        className="p-2 rounded-lg bg-background/90 hover:bg-primary/20 border border-primary/30 transition-colors shadow-lg"
-                        aria-label="ערוך"
-                        title="ערוך"
-                      >
-                        <Edit2 className="w-5 h-5 text-primary" />
-                      </button>
-                      <button
-                        onClick={() => handleOpenRoomCostDelete(cost.id)}
-                        className="p-2 rounded-lg bg-background/90 hover:bg-destructive/20 border border-destructive/30 transition-colors shadow-lg"
-                        aria-label="מחק"
-                        title="מחק"
-                      >
-                        <Trash2 className="w-5 h-5 text-destructive" />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleOpenRoomCostEdit(cost)}
+                          className="inline-flex items-center justify-center p-2 rounded-lg border border-primary/20 hover:border-primary/40 hover:bg-primary/10 text-primary transition-all duration-200"
+                          aria-label="ערוך"
+                          title="ערוך"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenRoomCostDelete(cost.id)}
+                          className="inline-flex items-center justify-center p-2 rounded-lg border border-destructive/20 hover:border-destructive/40 hover:bg-destructive/10 text-destructive transition-all duration-200"
+                          aria-label="מחק"
+                          title="מחק"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                       <span className="text-xs text-muted-foreground font-medium">לכל יחידה</span>
-                      <span className="text-lg font-bold text-primary">₪{cost.unitCost.toFixed(2)}</span>
+                    </div>
+                    <div className="text-right rtl:text-left mb-1">
+                      <span className="text-xl font-bold text-primary">₪{cost.unitCost.toFixed(2)}</span>
                     </div>
                     <h3 className="text-base font-semibold text-foreground">{cost.label}</h3>
                     <p className="text-xs text-muted-foreground mt-1">כמות ברירת מחדל: {cost.defaultQty}</p>
