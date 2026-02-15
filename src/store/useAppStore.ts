@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { format, parseISO } from 'date-fns';
+import type { User } from '@supabase/supabase-js';
 import type { Room, Booking, CostCatalogItem, MonthLock, Forecast, Expense, HotelCost, Partner, ManualReferral, PartnerStats, AppState, UIState, SelectedCost, PartnerReferral } from '../types/models';
 import type { StorageAdapter } from '../storage/LocalStorageAdapter';
 import { SupabaseAdapter } from '../storage/SupabaseAdapter';
@@ -25,6 +26,8 @@ interface BookingInput {
 
 interface StoreState extends AppState, UIState {
   [x: string]: any;
+  user: User | null;
+  setUser: (user: User | null) => void;
   storage: StorageAdapter;
   setSelectedMonthKey: (key: string) => void;
   addRoom: (data: { name: string; number?: string }) => void;
@@ -118,6 +121,8 @@ function hasBookingConflict(
 }
 
 export const useAppStore = create<StoreState>((set, get) => ({
+  user: null,
+  setUser: (user) => set({ user }),
   storage,
   rooms: [],
   bookings: [],

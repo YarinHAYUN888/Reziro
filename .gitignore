@@ -5,6 +5,9 @@ node_modules/
 dist/
 *.local
 
+# Supabase CLI link state (machine-specific)
+supabase/.temp/
+
 # Env (secrets – use .env.example as template)
 .env
 .env.local

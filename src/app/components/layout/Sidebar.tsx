@@ -1,8 +1,11 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { Home, Building2, DollarSign, TrendingUp, Settings, Package, Users } from 'lucide-react';
+import { Home, Building2, DollarSign, TrendingUp, Settings, Package, Users, LogOut } from 'lucide-react';
 import { cn } from '../ui/utils';
+import { Button } from '../ui/button';
+import { signOut } from '../../../lib/auth';
+import { useAppStore } from '../../../store/useAppStore';
 
 const navItems = [
   {
@@ -44,9 +47,15 @@ const navItems = [
 
 export function Sidebar() {
   const { t } = useTranslation();
+  const setUser = useAppStore((state) => state.setUser);
+
+  async function handleLogout() {
+    await signOut();
+    setUser(null);
+  }
 
   return (
-    <aside className="w-64 bg-card border-r border-border min-h-screen p-6">
+    <aside className="w-64 bg-card border-r border-border min-h-screen p-6 flex flex-col">
       <div className="mb-1 flex flex-col items-center">
       <img
         src="https://i.postimg.cc/W18Mh7B5/2.png"
@@ -56,7 +65,7 @@ export function Sidebar() {
         <p className="text-xs text-muted-foreground mt-1 font-semibold"></p>
       </div>
 
-      <nav className="space-y-2">
+      <nav className="space-y-2 flex-1">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
@@ -75,6 +84,15 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      <Button
+        variant="ghost"
+        className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+        onClick={handleLogout}
+      >
+        <LogOut className="w-5 h-5" />
+        <span className="font-semibold">{t('sidebar.logout') ?? 'Log out'}</span>
+      </Button>
     </aside>
   );
 }

@@ -49,25 +49,25 @@ type TableName =
   | typeof FORECAST_RECORDS
   | typeof EXPENSE_RECORDS;
 
-/** Allowed columns per table (actual Supabase schema). Unknown keys are stripped. */
+/** Allowed columns per table (actual Supabase schema). Unknown keys are stripped. Includes user_id for RLS. */
 const ALLOWED_COLUMNS: Record<TableName, readonly string[]> = {
-  [ROOMS]: ['id', 'room_name', 'room_number', 'created_at'],
+  [ROOMS]: ['id', 'user_id', 'room_name', 'room_number', 'created_at'],
   [INCOME_RECORDS]: [
-    'id', 'room_id', 'start_date', 'end_date', 'month_key', 'week_of_month',
+    'id', 'user_id', 'room_id', 'start_date', 'end_date', 'month_key', 'week_of_month',
     'price_per_night', 'nights_count', 'income', 'extra_expenses',
     'selected_room_costs', 'selected_hotel_costs', 'partner_referrals',
     'totals', 'metrics', 'customer', 'created_at', 'updated_at',
   ],
-  [ROOM_FINANCIALS]: ['id', 'type', 'entity_type', 'label', 'unit_cost', 'is_active', 'amount', 'created_at', 'updated_at'],
+  [ROOM_FINANCIALS]: ['id', 'user_id', 'type', 'entity_type', 'label', 'unit_cost', 'is_active', 'amount', 'created_at', 'updated_at'],
   [PARTNERS]: [
-    'id', 'name', 'type', 'phone', 'email', 'commission_type', 'commission_value',
+    'id', 'user_id', 'name', 'type', 'phone', 'email', 'commission_type', 'commission_value',
     'discount_for_guests', 'location', 'notes', 'is_active', 'created_at', 'updated_at',
   ],
-  [TRANSACTIONS]: ['id', 'partner_id', 'guests_count', 'date', 'notes', 'commission_earned', 'month_key', 'created_at', 'type'],
-  [MONTHLY_CONTROLS]: ['month_key', 'is_locked', 'locked_at'],
-  [FORECAST_RECORDS]: ['id', 'month_key', 'category', 'expected_amount', 'confidence', 'period', 'type', 'created_at'],
+  [TRANSACTIONS]: ['id', 'user_id', 'partner_id', 'guests_count', 'date', 'notes', 'commission_earned', 'month_key', 'created_at', 'type'],
+  [MONTHLY_CONTROLS]: ['month_key', 'user_id', 'is_locked', 'locked_at'],
+  [FORECAST_RECORDS]: ['id', 'user_id', 'month_key', 'category', 'expected_amount', 'confidence', 'period', 'type', 'created_at'],
   [EXPENSE_RECORDS]: [
-    'id', 'type', 'description', 'amount', 'date', 'month_key', 'room_id', 'booking_id',
+    'id', 'user_id', 'type', 'description', 'amount', 'date', 'month_key', 'room_id', 'booking_id',
     'selected_room_costs', 'selected_hotel_costs', 'created_at', 'updated_at',
   ],
 };
@@ -136,20 +136,23 @@ const EMPTY_STATE: AppState = {
 };
 
 /**
- * Load full app state from Supabase. Returns empty only when not configured; throws on error.
+ * Load full app state from Supabase. Requires authenticated user; filters by user_id. Returns empty when not configured; throws when not authenticated or on error.
  */
 export async function loadState(): Promise<AppState> {
   if (!isSupabaseConfigured()) return EMPTY_STATE;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not authenticated');
+  const userId = session.user.id;
   try {
     const [roomsData, incomeData, roomFinancialsData, partnersData, transactionsData, monthlyData, forecastsData, expensesData] = await Promise.all([
-      supabase.from(ROOMS).select('*'),
-      supabase.from(INCOME_RECORDS).select('*'),
-      supabase.from(ROOM_FINANCIALS).select('*'),
-      supabase.from(PARTNERS).select('*'),
-      supabase.from(TRANSACTIONS).select('*'),
-      supabase.from(MONTHLY_CONTROLS).select('*'),
-      supabase.from(FORECAST_RECORDS).select('*'),
-      supabase.from(EXPENSE_RECORDS).select('*'),
+      supabase.from(ROOMS).select('*').eq('user_id', userId),
+      supabase.from(INCOME_RECORDS).select('*').eq('user_id', userId),
+      supabase.from(ROOM_FINANCIALS).select('*').eq('user_id', userId),
+      supabase.from(PARTNERS).select('*').eq('user_id', userId),
+      supabase.from(TRANSACTIONS).select('*').eq('user_id', userId),
+      supabase.from(MONTHLY_CONTROLS).select('*').eq('user_id', userId),
+      supabase.from(FORECAST_RECORDS).select('*').eq('user_id', userId),
+      supabase.from(EXPENSE_RECORDS).select('*').eq('user_id', userId),
     ]);
     if (roomsData.error) throw roomsData.error;
     if (incomeData.error) throw incomeData.error;
@@ -205,28 +208,32 @@ function roomFinancialsRowForDb(row: Record<string, unknown>): Record<string, un
 }
 
 /**
- * Persist full app state to Supabase. All 8 tables; any failure throws (no partial save).
+ * Persist full app state to Supabase. All 8 tables; injects user_id for RLS. Any failure throws (no partial save).
  */
 export async function saveState(state: AppState): Promise<void> {
   if (!isSupabaseConfigured()) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not authenticated');
+  const userId = session.user.id;
 
-  const roomRows = state.rooms.map((r) => roomToRow(r) as Record<string, unknown>);
-  const bookingRows = state.bookings.map((r) => toSnake(bookingToRow(r) as Record<string, unknown>));
+  const roomRows = state.rooms.map((r) => ({ ...(roomToRow(r) as Record<string, unknown>), user_id: userId }));
+  const bookingRows = state.bookings.map((r) => ({ ...toSnake(bookingToRow(r) as Record<string, unknown>), user_id: userId }));
   const costRows = state.costCatalog.map((m) =>
-    roomFinancialsRowForDb({ ...toSnake(costCatalogToRow(m) as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG })
+    roomFinancialsRowForDb({ ...toSnake(costCatalogToRow(m) as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG, user_id: userId })
   );
   const hotelRows = state.hotelCosts.map((m) =>
-    roomFinancialsRowForDb({ ...toSnake(hotelCostToRow(m) as Record<string, unknown>), entity_type: ENTITY_HOTEL_COST })
+    roomFinancialsRowForDb({ ...toSnake(hotelCostToRow(m) as Record<string, unknown>), entity_type: ENTITY_HOTEL_COST, user_id: userId })
   );
   const roomFinancialsRows = [...costRows, ...hotelRows];
-  const partnerRows = state.partners.map((r) => toSnake(partnerToRow(r) as Record<string, unknown>));
+  const partnerRows = state.partners.map((r) => ({ ...toSnake(partnerToRow(r) as Record<string, unknown>), user_id: userId }));
   const transactionRows = state.manualReferrals.map((m) => ({
     ...toSnake(manualReferralToRow(m) as Record<string, unknown>),
     type: ENTITY_MANUAL_REFERRAL,
+    user_id: userId,
   }));
-  const monthlyRows = Object.values(state.monthLocks).map((m) => toSnake(monthLockToRow(m) as Record<string, unknown>));
-  const forecastRows = state.forecasts.map((r) => toSnake(forecastToRow(r) as Record<string, unknown>));
-  const expenseRows = state.expenses.map((r) => toSnake(expenseToRow(r) as Record<string, unknown>));
+  const monthlyRows = Object.values(state.monthLocks).map((m) => ({ ...toSnake(monthLockToRow(m) as Record<string, unknown>), user_id: userId }));
+  const forecastRows = state.forecasts.map((r) => ({ ...toSnake(forecastToRow(r) as Record<string, unknown>), user_id: userId }));
+  const expenseRows = state.expenses.map((r) => ({ ...toSnake(expenseToRow(r) as Record<string, unknown>), user_id: userId }));
 
   await saveEntity(ROOMS, roomRows, 'id');
   await saveEntity(INCOME_RECORDS, bookingRows, 'id');

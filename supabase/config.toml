@@ -1,0 +1,17 @@
+# Supabase project config (project_id from your .env URL)
+project_id = "ytosgfrrlkxwcwzibhpy"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+shadow_port = 54320
+
+[db.migrations]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323

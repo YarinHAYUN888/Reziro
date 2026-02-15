@@ -22,6 +22,7 @@ const resources = {
       'sidebar.partners': 'Partners',
       'sidebar.forecast': 'Forecast',
       'sidebar.settings': 'Settings',
+      'sidebar.logout': 'Log out',
       
       // Dashboard
       'dashboard.title': 'System Lobby',
@@ -263,6 +264,7 @@ const resources = {
       'sidebar.partners': 'שותפים',
       'sidebar.forecast': 'תחזית',
       'sidebar.settings': 'הגדרות',
+      'sidebar.logout': 'התנתק',
       
       // Dashboard
       'dashboard.title': 'לובי המערכת',
