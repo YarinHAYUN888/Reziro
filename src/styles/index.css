@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 140 80% 3%;
+    --foreground: 140 10% 95%;
+    --card: 140 70% 5%;
+    --card-foreground: 140 10% 95%;
+    --popover: 140 70% 5%;
+    --popover-foreground: 140 10% 95%;
+    --primary: 86 100% 62%;
+    --primary-foreground: 140 90% 2%;
+    --secondary: 140 50% 8%;
+    --secondary-foreground: 140 10% 95%;
+    --muted: 140 40% 12%;
+    --muted-foreground: 140 10% 70%;
+    --accent: 140 60% 10%;
+    --accent-foreground: 140 10% 95%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 140 10% 95%;
+    --border: 140 50% 15%;
+    --input: 140 40% 12%;
+    --ring: 86 100% 62%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background: 
+      radial-gradient(ellipse at top, rgba(14, 40, 20, 0.8) 0%, transparent 60%),
+      radial-gradient(ellipse at bottom, rgba(10, 30, 15, 0.7) 0%, transparent 60%),
+      linear-gradient(
+        135deg,
+        #050f08 0%,
+        #0a1810 15%,
+        #0e2414 30%,
+        #081a0f 50%,
+        #0c2212 70%,
+        #061408 85%,
+        #030a05 100%
+      );
+    background-attachment: fixed;
+    background-size: 100% 100%;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass-card {
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    background: rgba(10, 30, 15, 0.35);
+    border: 1.5px solid rgba(124, 255, 58, 0.18);
+    box-shadow: 
+      0 8px 32px 0 rgba(0, 0, 0, 0.6),
+      0 0 0 1px rgba(124, 255, 58, 0.05) inset,
+      0 2px 4px 0 rgba(124, 255, 58, 0.1) inset;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .glass-card:hover {
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    background: rgba(10, 30, 15, 0.45);
+    border-color: rgba(124, 255, 58, 0.35);
+    box-shadow: 
+      0 12px 40px 0 rgba(0, 0, 0, 0.7),
+      0 0 40px rgba(124, 255, 58, 0.25),
+      0 0 0 1px rgba(124, 255, 58, 0.12) inset,
+      0 4px 8px 0 rgba(124, 255, 58, 0.15) inset;
+  }
+  
+  .glass-button {
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    background: rgba(10, 30, 15, 0.3);
+    border: 1px solid rgba(124, 255, 58, 0.25);
+    box-shadow: 
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(124, 255, 58, 0.08) inset;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .glass-button:hover {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: rgba(10, 30, 15, 0.5);
+    border-color: rgba(124, 255, 58, 0.45);
+    box-shadow: 
+      0 6px 24px rgba(0, 0, 0, 0.5),
+      0 0 30px rgba(124, 255, 58, 0.3),
+      0 0 0 1px rgba(124, 255, 58, 0.15) inset;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 30, 15, 0.5);
+  border-radius: 12px;
+  border: 2px solid rgba(5, 15, 8, 0.7);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #7CFF3A 0%, #5FE89D 100%);
+  border-radius: 12px;
+  border: 3px solid rgba(10, 30, 15, 0.5);
+  box-shadow: 
+    0 0 10px rgba(124, 255, 58, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #8FFF4D 0%, #72F9B0 100%);
+  box-shadow: 
+    0 0 20px rgba(124, 255, 58, 0.6),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+/* 🛡️ הסתרת NaN בממשק */
+*:has(> *:only-child:contains("NaN")) {
+  display: none;
+}
+
+/* או אם זה לא עובד, נוסיף CSS ספציפי */
+.financial-card:has(*:contains("NaN")),
+.cost-card:has(*:contains("NaN")),
+.stat-card:has(*:contains("NaN")) {
+  display: none;
+}
