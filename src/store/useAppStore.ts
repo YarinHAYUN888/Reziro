@@ -3,6 +3,7 @@ import { format, parseISO } from 'date-fns';
 import type { Room, Booking, CostCatalogItem, MonthLock, Forecast, Expense, HotelCost, Partner, ManualReferral, PartnerStats, AppState, UIState, SelectedCost, PartnerReferral } from '../types/models';
 import type { StorageAdapter } from '../storage/LocalStorageAdapter';
 import { SupabaseAdapter } from '../storage/SupabaseAdapter';
+import { DEFAULT_ROOM_COSTS } from '../data/defaultRoomCosts';
 import { normalizeAndComputeBooking } from '../utils/calcEngine';
 
 interface BookingInput {
@@ -107,27 +108,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
   bookings: [],
   monthlyBanksExpense: 0,
 monthlyEmployeesExpense: 0,
-  costCatalog: [
-    { id: 'r1', type: 'room', label: 'נעלי בית', unitCost: 2.99, defaultQty: 2, isActive: true },
-    { id: 'r2', type: 'room', label: 'ערכת טיפוח', unitCost: 0.649, defaultQty: 1, isActive: true },
-    { id: 'r3', type: 'room', label: 'קרם גוף', unitCost: 1.416, defaultQty: 1, isActive: true },
-    { id: 'r4', type: 'room', label: 'סבונים', unitCost: 0.912, defaultQty: 2, isActive: true },
-    { id: 'r5', type: 'room', label: 'קפה שחור', unitCost: 0.795, defaultQty: 2, isActive: true },
-    { id: 'r6', type: 'room', label: "סטור צ'יז", unitCost: 1.99, defaultQty: 2, isActive: true },
-    { id: 'r7', type: 'room', label: 'קפסולות', unitCost: 7.96, defaultQty: 4, isActive: true },
-    { id: 'r8', type: 'room', label: 'חטיפים', unitCost: 0.575, defaultQty: 2, isActive: true },
-    { id: 'r9', type: 'room', label: 'סוכריות', unitCost: 0.69, defaultQty: 2, isActive: true },
-    { id: 'r10', type: 'room', label: 'קצף אמבט', unitCost: 2.87, defaultQty: 1, isActive: true },
-    { id: 'r11', type: 'room', label: 'מרכך ומגבת', unitCost: 52, defaultQty: 1, isActive: true },
-    { id: 'r12', type: 'room', label: 'חומרי ניקוי', unitCost: 5, defaultQty: 1, isActive: true },
-    { id: 'r13', type: 'room', label: 'סט טואלט', unitCost: 1, defaultQty: 2, isActive: true },
-    { id: 'r14', type: 'room', label: 'סט מצעים קומפלט', unitCost: 36, defaultQty: 1, isActive: true },
-// (אופציונלי) פיקדון בחדר – לפי מחיר (גם לפי התמונות)
-{ id: 'r15', type: 'room', label: 'שוקולד', unitCost: 16, defaultQty: 1, isActive: false },
-{ id: 'r16', type: 'room', label: 'יין', unitCost: 28, defaultQty: 1, isActive: false },
-{ id: 'r17', type: 'room', label: 'גבינה', unitCost: 16, defaultQty: 1, isActive: false },
-{ id: 'r18', type: 'room', label: 'קרקרים', unitCost: 7.08, defaultQty: 1, isActive: false },  
-  ],
+  costCatalog: DEFAULT_ROOM_COSTS,
   hotelCosts: [],
   partners: [],
   manualReferrals: [], // 🆕 NEW

@@ -1,7 +1,3 @@
--- Restore Room Cost records to room_financials
--- Run in Supabase Dashboard → SQL Editor
--- Ensures room cost catalog items exist; updates if already present
-
 INSERT INTO room_financials (id, "type", entity_type, label, unit_cost, default_qty, is_active)
 VALUES
   ('rc-001', 'room', 'cost_catalog', 'נעלי בית', 2.99, 2, true),

@@ -11,6 +11,7 @@ import { Financial } from './pages/Financial';
 import { Admin } from './pages/Admin';
 import Partners from './pages/Partners';
 import { useAppStore } from '../store/useAppStore';
+import { DEFAULT_ROOM_COSTS } from '../data/defaultRoomCosts';
 import i18n from '../i18n/config';
 
 export default function App() {
@@ -27,10 +28,16 @@ export default function App() {
     storage
       .loadState()
       .then((savedState) => {
-        useAppStore.setState({
+        const mergedState = {
           ...savedState,
+          costCatalog:
+            savedState.costCatalog.length === 0 ? DEFAULT_ROOM_COSTS : savedState.costCatalog,
           isHydrated: true,
-        });
+        };
+        useAppStore.setState(mergedState);
+        if (savedState.costCatalog.length === 0) {
+          useAppStore.getState().storage.saveState(useAppStore.getState());
+        }
       })
       .catch(() => {
         useAppStore.setState({ isHydrated: true });
