@@ -58,7 +58,7 @@ const ALLOWED_COLUMNS: Record<TableName, readonly string[]> = {
     'selected_room_costs', 'selected_hotel_costs', 'partner_referrals',
     'totals', 'metrics', 'customer', 'created_at', 'updated_at',
   ],
-  [ROOM_FINANCIALS]: ['id', 'user_id', 'type', 'entity_type', 'label', 'unit_cost', 'is_active', 'amount', 'created_at', 'updated_at'],
+  [ROOM_FINANCIALS]: ['id', 'user_id', 'type', 'entity_type', 'label', 'unit_cost', 'default_qty', 'is_active', 'category', 'amount', 'created_at', 'updated_at'],
   [PARTNERS]: [
     'id', 'user_id', 'name', 'type', 'phone', 'email', 'commission_type', 'commission_value',
     'discount_for_guests', 'location', 'notes', 'is_active', 'created_at', 'updated_at',
@@ -97,6 +97,7 @@ function sanitizeRow(tableName: TableName, row: Record<string, unknown>): Record
 
 /**
  * Upsert rows for one table. Validates keys, strips unknown, throws on error.
+ * conflictColumn may be a single column or comma-separated for composite key (e.g. 'user_id,month_key').
  */
 export function saveEntity(
   tableName: TableName,
@@ -105,11 +106,14 @@ export function saveEntity(
 ): Promise<void> {
   if (rows.length === 0) return Promise.resolve();
   const sanitized = rows.map((r) => sanitizeRow(tableName, r as Record<string, unknown>));
+  const conflictColumns = conflictColumn.split(',').map((c) => c.trim());
   for (let i = 0; i < sanitized.length; i++) {
     const row = sanitized[i];
-    if (row[conflictColumn] === undefined || row[conflictColumn] === null) {
-      console.error(`[supabaseSync] Missing required key '${conflictColumn}' for table '${tableName}' (row ${i})`);
-      throw new Error(`Missing required key '${conflictColumn}' for table '${tableName}'`);
+    for (const col of conflictColumns) {
+      if (row[col] === undefined || row[col] === null) {
+        console.error(`[supabaseSync] Missing required key '${col}' for table '${tableName}' (row ${i})`);
+        throw new Error(`Missing required key '${col}' for table '${tableName}'`);
+      }
     }
   }
   return supabase
@@ -201,10 +205,9 @@ export async function loadState(): Promise<AppState> {
   }
 }
 
-/** Strip columns not in production room_financials (category, default_qty). */
+/** Pass through room_financials row; DB has category, default_qty, amount, created_at, updated_at. */
 function roomFinancialsRowForDb(row: Record<string, unknown>): Record<string, unknown> {
-  const { category: _c, default_qty: _q, ...rest } = row;
-  return rest;
+  return row;
 }
 
 /**
@@ -222,7 +225,7 @@ export async function saveState(state: AppState): Promise<void> {
     roomFinancialsRowForDb({ ...toSnake(costCatalogToRow(m) as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG, user_id: userId })
   );
   const hotelRows = state.hotelCosts.map((m) =>
-    roomFinancialsRowForDb({ ...toSnake(hotelCostToRow(m) as Record<string, unknown>), entity_type: ENTITY_HOTEL_COST, user_id: userId })
+    roomFinancialsRowForDb({ ...toSnake(hotelCostToRow(m) as Record<string, unknown>), type: 'hotel', entity_type: ENTITY_HOTEL_COST, user_id: userId })
   );
   const roomFinancialsRows = [...costRows, ...hotelRows];
   const partnerRows = state.partners.map((r) => ({ ...toSnake(partnerToRow(r) as Record<string, unknown>), user_id: userId }));
@@ -240,7 +243,7 @@ export async function saveState(state: AppState): Promise<void> {
   await saveEntity(ROOM_FINANCIALS, roomFinancialsRows, 'id');
   await saveEntity(PARTNERS, partnerRows, 'id');
   await saveEntity(TRANSACTIONS, transactionRows, 'id');
-  await saveEntity(MONTHLY_CONTROLS, monthlyRows, 'month_key');
+  await saveEntity(MONTHLY_CONTROLS, monthlyRows, 'user_id,month_key');
   await saveEntity(FORECAST_RECORDS, forecastRows, 'id');
   await saveEntity(EXPENSE_RECORDS, expenseRows, 'id');
 }

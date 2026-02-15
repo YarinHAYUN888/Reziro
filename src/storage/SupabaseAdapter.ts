@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import type { AppState } from '../types/models';
 import type { StorageAdapter } from './LocalStorageAdapter';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -37,7 +38,10 @@ export class SupabaseAdapter implements StorageAdapter {
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => {
       this.saveTimeout = null;
-      saveState(state).catch((err) => console.error('SupabaseAdapter.saveState failed:', err));
+      saveState(state).catch((err) => {
+        console.error('SupabaseAdapter.saveState failed:', err);
+        toast.error(typeof err === 'object' && err && 'message' in err ? String((err as Error).message) : 'Failed to save');
+      });
     }, this.debounceMs);
   }
 }
