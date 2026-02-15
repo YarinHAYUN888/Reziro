@@ -421,14 +421,15 @@ export async function loadAppState(): Promise<AppState> {
   }
 }
 
-function stripCategoryFromRow(row: Record<string, unknown>): Record<string, unknown> {
-  const { category: _category, ...rest } = row;
+/** Strip columns that don't exist on room_financials in production (category, default_qty). */
+function roomFinancialsRowForDb(row: Record<string, unknown>): Record<string, unknown> {
+  const { category: _c, default_qty: _q, ...rest } = row;
   return rest;
 }
 
 function buildSavePayload(state: AppState): Record<string, unknown[]> {
-  const costRows = state.costCatalog.map((m) => stripCategoryFromRow({ ...toSnake(costCatalogToRow(m) as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG }));
-  const hotelRows = state.hotelCosts.map((m) => stripCategoryFromRow({ ...toSnake(hotelCostToRow(m) as Record<string, unknown>), entity_type: ENTITY_HOTEL_COST }));
+  const costRows = state.costCatalog.map((m) => roomFinancialsRowForDb({ ...toSnake(costCatalogToRow(m) as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG }));
+  const hotelRows = state.hotelCosts.map((m) => roomFinancialsRowForDb({ ...toSnake(hotelCostToRow(m) as Record<string, unknown>), entity_type: ENTITY_HOTEL_COST }));
   const roomFinancials = [...costRows, ...hotelRows];
   const monthlyControls = Object.values(state.monthLocks).map((m) => toSnake(monthLockToRow(m) as Record<string, unknown>));
   const transactions = state.manualReferrals.map((m) => ({ ...toSnake(manualReferralToRow(m) as Record<string, unknown>), type: ENTITY_MANUAL_REFERRAL }));
@@ -501,8 +502,8 @@ async function upsertRoomFinancials(
   costRows: Record<string, unknown>[],
   hotelRows: Record<string, unknown>[]
 ): Promise<void> {
-  const withCostType = costRows.map((r) => stripCategoryFromRow({ ...toSnake(r as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG }));
-  const withHotelType = hotelRows.map((r) => stripCategoryFromRow({ ...toSnake(r as Record<string, unknown>), entity_type: ENTITY_HOTEL_COST }));
+  const withCostType = costRows.map((r) => roomFinancialsRowForDb({ ...toSnake(r as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG }));
+  const withHotelType = hotelRows.map((r) => roomFinancialsRowForDb({ ...toSnake(r as Record<string, unknown>), entity_type: ENTITY_HOTEL_COST }));
   const all = [...withCostType, ...withHotelType];
   if (all.length === 0) return;
   const { error } = await supabase.from(ROOM_FINANCIALS).upsert(all, { onConflict: 'id' });
