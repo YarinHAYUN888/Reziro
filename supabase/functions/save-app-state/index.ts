@@ -5,9 +5,11 @@ declare const Deno: {
 // @ts-expect-error - ESM URL import for Deno runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 interface SavePayload {
@@ -23,11 +25,12 @@ interface SavePayload {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  const url = Deno.env.get("SUPABASE_URL=https://rkopdvbjbzrtdtwyqwlz.supabase.co") ?? "";
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrb3BkdmJqYnpydGR0d3lxd2x6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczOTYyNjI3MiwiZXhwIjoyMDUzMjAyMjcyfQ.3aOZ4N91BjG632uqP2r0aE--NfLzFw-4uE-Gg-vQwLc") ?? "";
+  // Set in Supabase Dashboard: Edge Function secrets / environment (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   if (!url || !key) {
     console.error("save-app-state: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing");
     return new Response(

@@ -65,8 +65,8 @@ export function roomFromRow(row: Record<string, unknown>): Room {
   const r = rowToApp(row) as Record<string, unknown>;
   return {
     id: String(r.id ?? ''),
-    name: String(r.name ?? ''),
-    number: r.number != null ? String(r.number) : undefined,
+    name: String(r.roomName ?? r.room_name ?? r.name ?? ''),
+    number: r.roomNumber != null || r.room_number != null ? String(r.roomNumber ?? r.room_number) : (r.number != null ? String(r.number) : undefined),
     createdAt: String(r.createdAt ?? r.created_at ?? ''),
   };
 }
@@ -214,12 +214,12 @@ export function expenseFromRow(row: Record<string, unknown>): Expense {
 // --- App model -> DB row (for insert/upsert) ---
 
 export function roomToRow(m: Room): Record<string, unknown> {
-  return appToRow({
+  return {
     id: m.id,
-    name: m.name,
-    number: m.number ?? null,
-    createdAt: m.createdAt,
-  });
+    room_name: m.name,
+    room_number: m.number != null ? Number(m.number) : null,
+    created_at: m.createdAt,
+  };
 }
 
 export function bookingToRow(m: Booking): Record<string, unknown> {
