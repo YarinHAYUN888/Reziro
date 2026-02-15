@@ -20,6 +20,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { calcNightsCount, calcIncome, calcSelectedCostTotal, createSelectedCostFromCatalog } from '../../../utils/calcEngine';
 import type { SelectedCost, Booking, Partner, PartnerReferral } from '../../../types/models';
 import { ConfirmDeleteDialog } from '../shared/ConfirmDeleteDialog';
+import { BookingConflictDialog } from '../shared/BookingConflictDialog';
 import { Calendar } from '../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { CalendarIcon, AlertCircle, Edit2, ArrowRight, Users, Trash2, Plus } from 'lucide-react';
@@ -73,6 +74,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   const [viewMode, setViewMode] = useState<'list' | 'form'>(bookingId ? 'form' : 'list');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookingToDeleteId, setBookingToDeleteId] = useState<string | null>(null);
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
 
   const roomCosts = costCatalog.filter((c) => c.type === 'room' && c.isActive);
   const activePartners = partners.filter((p) => p.isActive);
@@ -277,26 +279,29 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
 
     if (currentBookingId) {
       const existingBooking = bookings.find((b) => b.id === currentBookingId);
-      
-      updateBooking(currentBookingId, {
+      const ok = updateBooking(currentBookingId, {
         ...bookingData,
         createdAt: existingBooking?.createdAt,
       });
-      
+      if (!ok) {
+        setConflictDialogOpen(true);
+        return;
+      }
       toast.success('✅ עודכן בהצלחה!', {
         duration: 2000,
         className: 'glass-card border-primary/40 bg-primary/10',
       });
-      
       onClose();
     } else {
-      createBooking(bookingData);
-      
+      const ok = createBooking(bookingData);
+      if (!ok) {
+        setConflictDialogOpen(true);
+        return;
+      }
       toast.success('✅ הזמנה נוצרה בהצלחה!', {
         duration: 2000,
         className: 'glass-card border-primary/40 bg-primary/10',
       });
-      
       onClose();
     }
   };
@@ -770,6 +775,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         description="האם אתה בטוח שברצונך למחוק הזמנה זו?"
         onConfirm={handleConfirmDeleteBooking}
       />
+      <BookingConflictDialog open={conflictDialogOpen} onOpenChange={setConflictDialogOpen} />
     </Dialog>
   );
 }

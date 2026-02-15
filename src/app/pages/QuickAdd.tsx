@@ -9,6 +9,7 @@ import { GlowButton } from '../components/shared/GlowButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useAppStore } from '../../store/useAppStore';
+import { BookingConflictDialog } from '../components/shared/BookingConflictDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Calendar } from '../components/ui/calendar';
@@ -33,6 +34,7 @@ export function QuickAdd() {
   const [bookingStartDate, setBookingStartDate] = useState<Date | undefined>();
   const [bookingEndDate, setBookingEndDate] = useState<Date | undefined>();
   const [bookingPrice, setBookingPrice] = useState(100);
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
 
   // Forecast form
   const [forecastMonth, setForecastMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -58,7 +60,7 @@ export function QuickAdd() {
       return;
     }
 
-    createBooking({
+    const ok = createBooking({
       roomId: bookingRoomId,
       startDate: format(bookingStartDate, 'yyyy-MM-dd'),
       endDate: format(bookingEndDate, 'yyyy-MM-dd'),
@@ -67,6 +69,11 @@ export function QuickAdd() {
       selectedRoomCosts: [],
       selectedHotelCosts: [],
     });
+
+    if (!ok) {
+      setConflictDialogOpen(true);
+      return;
+    }
 
     toast.success(t('quickAdd.bookingCreated'));
     setBookingRoomId('');
@@ -292,6 +299,8 @@ export function QuickAdd() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <BookingConflictDialog open={conflictDialogOpen} onOpenChange={setConflictDialogOpen} />
     </div>
   );
 }

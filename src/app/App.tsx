@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
+import { LoadingScreen } from './components/shared/LoadingScreen';
 import { AppLayout } from './components/layout/AppLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Rooms } from './pages/Rooms';
@@ -45,14 +46,7 @@ export default function App() {
   }, []);
 
   if (!isHydrated) {
-    return (
-      <div className="min-h-screen bg-background dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-lg text-primary font-bold">Loading GEST'S...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (

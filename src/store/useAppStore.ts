@@ -30,8 +30,8 @@ interface StoreState extends AppState, UIState {
   addRoom: (data: { name: string; number?: string }) => void;
   updateRoom: (id: string, data: { name: string; number?: string }) => void;
   deleteRoom: (id: string) => void;
-  createBooking: (input: BookingInput) => void;
-  updateBooking: (id: string, input: Partial<BookingInput>) => void;
+  createBooking: (input: BookingInput) => boolean;
+  updateBooking: (id: string, input: Partial<BookingInput>) => boolean;
   deleteBooking: (id: string) => void;
   monthlyBanksExpense: number;
 monthlyEmployeesExpense: number;
@@ -101,6 +101,21 @@ setMonthlyEmployeesExpense: (amount: number) => void;
 }
 
 const storage = new SupabaseAdapter();
+
+function hasBookingConflict(
+  bookings: Booking[],
+  roomId: string,
+  startDate: string,
+  endDate: string,
+  excludeId?: string
+): boolean {
+  const candidates = bookings.filter(
+    (b) => b.roomId === roomId && (!excludeId || b.id !== excludeId)
+  );
+  return candidates.some(
+    (b) => startDate < b.endDate && endDate > b.startDate
+  );
+}
 
 export const useAppStore = create<StoreState>((set, get) => ({
   storage,
@@ -175,28 +190,27 @@ monthlyEmployeesExpense: 0,
 
   createBooking: (input) => {
     if (get().isMonthLocked(input.startDate.substring(0, 7))) {
-      alert('Cannot create booking in a locked month.');
-      return;
+      return false;
     }
-    
+    if (hasBookingConflict(get().bookings, input.roomId, input.startDate, input.endDate)) {
+      return false;
+    }
     const booking = normalizeAndComputeBooking(input);
-    
     set((state) => {
       const bookings = [...state.bookings, booking];
       const newState = { ...state, bookings };
-      
       const storage = get().storage;
       if (storage?.saveState) {
         storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       }
-      
       return newState;
     });
+    return true;
   },
 
   updateBooking: (id, input) => {
     const existing = get().bookings.find((b) => b.id === id);
-    if (!existing) return;
+    if (!existing) return false;
 
     const mergedInput: BookingInput = {
       roomId: input.roomId ?? existing.roomId,
@@ -206,25 +220,28 @@ monthlyEmployeesExpense: 0,
       extraExpenses: input.extraExpenses ?? existing.extraExpenses,
       selectedRoomCosts: input.selectedRoomCosts ?? existing.selectedRoomCosts,
       selectedHotelCosts: input.selectedHotelCosts ?? existing.selectedHotelCosts,
-      partnerReferrals: input.partnerReferrals ?? existing.partnerReferrals, // 🆕 NEW
+      partnerReferrals: input.partnerReferrals ?? existing.partnerReferrals,
       customer: input.customer ?? existing.customer,
       createdAt: input.createdAt ?? existing.createdAt,
     };
+
+    if (hasBookingConflict(get().bookings, mergedInput.roomId, mergedInput.startDate, mergedInput.endDate, id)) {
+      return false;
+    }
 
     const recomputed = normalizeAndComputeBooking(mergedInput);
     const finalBooking: Booking = { ...recomputed, id };
 
     set((state) => {
-      const bookings = state.bookings.map((b) => b.id === id ? finalBooking : b);
+      const bookings = state.bookings.map((b) => (b.id === id ? finalBooking : b));
       const newState = { ...state, bookings };
-      
       const storage = get().storage;
       if (storage?.saveState) {
         storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       }
-      
       return newState;
     });
+    return true;
   },
 
   deleteBooking: (id) => {
