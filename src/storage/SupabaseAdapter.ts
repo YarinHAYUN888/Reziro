@@ -42,7 +42,7 @@ export class SupabaseAdapter implements StorageAdapter {
         const msg = typeof err === 'object' && err && 'message' in err
           ? String((err as Error).message)
           : String(err ?? '');
-        const isSchemaOrDbError = /room_financials|schema cache|column.*does not exist|could not find.*column|column.*in the schema/i.test(msg);
+        const isSchemaOrDbError = /room_financials|schema cache|column.*does not exist|could not find.*column|column.*in the schema|invalid input syntax for type uuid/i.test(msg);
         console.error('SupabaseAdapter.saveState failed:', err);
         if (!isSchemaOrDbError) {
           toast.error(msg || 'Failed to save');
