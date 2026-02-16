@@ -3,4 +3,12 @@ import type { AppState } from '../types/models';
 export interface StorageAdapter {
   loadState(): Promise<AppState>;
   saveState(state: AppState): Promise<void>;
+  /** Optional: immediate save of partners only (Supabase). No-op if not implemented. */
+  savePartnersNow?(state: AppState): Promise<void>;
+  /** Optional: delete one partner in DB (Supabase). No-op if not implemented. */
+  deletePartnerNow?(partnerId: string): Promise<void>;
+  /** Optional: immediate save of manual referrals only (Supabase). */
+  saveManualReferralsNow?(state: AppState): Promise<void>;
+  /** Optional: delete one manual referral in DB (Supabase). */
+  deleteManualReferralNow?(transactionId: string): Promise<void>;
 }

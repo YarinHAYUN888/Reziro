@@ -58,12 +58,12 @@ const ALLOWED_COLUMNS: Record<TableName, readonly string[]> = {
     'selected_room_costs', 'selected_hotel_costs', 'partner_referrals',
     'totals', 'metrics', 'customer', 'created_at', 'updated_at',
   ],
-  [ROOM_FINANCIALS]: ['id', 'user_id', 'type', 'entity_type', 'label', 'unit_cost', 'default_qty', 'is_active', 'category', 'amount', 'created_at', 'updated_at'],
+  [ROOM_FINANCIALS]: ['id', 'user_id', 'room_id', 'type', 'entity_type', 'label', 'unit_cost', 'default_qty', 'is_active', 'category', 'amount', 'created_at', 'updated_at'],
   [PARTNERS]: [
-    'id', 'user_id', 'name', 'type', 'phone', 'email', 'commission_type', 'commission_value',
-    'discount_for_guests', 'location', 'notes', 'is_active', 'created_at', 'updated_at',
+    'id', 'user_id', 'name', 'business_name', 'type', 'phone', 'email', 'commission_type', 'commission_value',
+    'is_active', 'created_at', 'updated_at',
   ],
-  [TRANSACTIONS]: ['id', 'user_id', 'partner_id', 'guests_count', 'date', 'notes', 'commission_earned', 'month_key', 'created_at', 'type'],
+  [TRANSACTIONS]: ['id', 'user_id', 'partner_id', 'guests_count', 'date', 'notes', 'commission_earned', 'month_key', 'created_at', 'type', 'amount'],
   [MONTHLY_CONTROLS]: ['month_key', 'user_id', 'is_locked', 'locked_at'],
   [FORECAST_RECORDS]: ['id', 'user_id', 'month_key', 'category', 'expected_amount', 'confidence', 'period', 'type', 'created_at'],
   [EXPENSE_RECORDS]: [
@@ -71,6 +71,25 @@ const ALLOWED_COLUMNS: Record<TableName, readonly string[]> = {
     'selected_room_costs', 'selected_hotel_costs', 'created_at', 'updated_at',
   ],
 };
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUUID(s: string): boolean {
+  return UUID_REGEX.test(s);
+}
+
+/** Deterministic UUID from string seed (for room_financials so same catalog item always gets same id for upsert). */
+function deterministicUUID(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
+  const toHex = (n: number, len: number) => ('0'.repeat(len) + ((n >>> 0) & 0xffffffff).toString(16)).slice(-len);
+  const h1 = toHex(h, 8);
+  const h2 = toHex(Math.imul(h, 31), 4);
+  const h3 = toHex(Math.imul(h, 37), 4);
+  const h4 = toHex(Math.imul(h, 41), 4);
+  const h5 = toHex(Math.imul(h, 43), 4) + toHex(h + seed.length, 8);
+  return `${h1}-${h2}-4${h3}-8${h4}-${h5}`;
+}
 
 function toSnake(obj: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -178,7 +197,10 @@ export async function loadState(): Promise<AppState> {
       .map((r) => hotelCostFromRow(r));
     const partners = (partnersData.data ?? []).map((r) => partnerFromRow(r as Record<string, unknown>));
     const manualReferrals = (transactionsData.data ?? [])
-      .filter((r: Record<string, unknown>) => (r.type as string) === ENTITY_MANUAL_REFERRAL)
+      .filter((r: Record<string, unknown>) => {
+        const t = r.type as string;
+        return t === ENTITY_MANUAL_REFERRAL || t === 'income';
+      })
       .map((r: Record<string, unknown>) => manualReferralFromRow(r));
     const monthLocks: Record<string, { monthKey: string; isLocked: boolean; lockedAt?: string }> = {};
     for (const row of monthlyData.data ?? []) {
@@ -205,13 +227,112 @@ export async function loadState(): Promise<AppState> {
   }
 }
 
-/** Pass through room_financials row; DB has category, default_qty, amount, created_at, updated_at. */
-function roomFinancialsRowForDb(row: Record<string, unknown>): Record<string, unknown> {
-  return row;
+/**
+ * Build one room_financials row with UUID id and room_id. Never use catalog string ids (e.g. rc-001) as id.
+ * Uses deterministic UUID from entity_type:itemId so same catalog item upserts to same row.
+ */
+function roomFinancialsRowForDb(
+  row: Record<string, unknown>,
+  entityType: string,
+  itemId: string,
+  firstRoomId: string
+): Record<string, unknown> {
+  const id = isUUID(String(row.id ?? '')) ? String(row.id) : deterministicUUID(`${entityType}:${itemId}`);
+  return {
+    ...row,
+    id,
+    room_id: firstRoomId,
+  };
+}
+
+/** Build partner rows for DB (shared by savePartnersOnly and saveState). */
+function buildPartnerRows(state: AppState, userId: string): Record<string, unknown>[] {
+  return state.partners.map((r) => ({
+    ...toSnake(partnerToRow(r) as Record<string, unknown>),
+    user_id: userId,
+    name: r.name ?? '',
+    business_name: r.name ?? '',
+    type: r.type ?? 'other',
+    commission_type: r.commissionType ?? 'percentage',
+    commission_value: r.commissionValue ?? 0,
+    is_active: r.isActive ?? true,
+    phone: r.phone ?? '',
+    email: r.email ?? '',
+  }));
 }
 
 /**
- * Persist full app state to Supabase. All 8 tables; injects user_id for RLS. Any failure throws (no partial save).
+ * Save only partners to Supabase (no debounce). Use after add/update/delete partner so data persists immediately.
+ */
+export async function savePartnersOnly(state: AppState): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not authenticated');
+  const userId = session.user.id;
+  const partnerRows = buildPartnerRows(state, userId);
+  if (partnerRows.length === 0) return;
+  await saveEntity(PARTNERS, partnerRows, 'id');
+}
+
+/**
+ * Delete one partner row in Supabase (for deletePartner). RLS ensures only own row can be deleted.
+ */
+export async function deletePartnerInDb(partnerId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not authenticated');
+  const { error } = await supabase.from(PARTNERS).delete().eq('id', partnerId).eq('user_id', session.user.id);
+  if (error) {
+    console.error('[supabaseSync] delete partner failed:', error.message);
+    throw error;
+  }
+}
+
+/** Build transaction rows for manual referrals (shared by saveManualReferralsOnly and saveState). */
+function buildTransactionRows(state: AppState, userId: string): Record<string, unknown>[] {
+  return state.manualReferrals.map((m) => ({
+    ...toSnake(manualReferralToRow(m) as Record<string, unknown>),
+    type: 'income' as const,
+    user_id: userId,
+    partner_id: m.partnerId ?? '',
+    guests_count: m.guestsCount ?? 0,
+    date: m.date ?? '',
+    commission_earned: m.commissionEarned ?? 0,
+    month_key: m.monthKey ?? '',
+    amount: m.commissionEarned ?? 0,
+  }));
+}
+
+/**
+ * Save only manual referrals (transactions) to Supabase. Use after add/delete referral so data persists immediately.
+ */
+export async function saveManualReferralsOnly(state: AppState): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not authenticated');
+  const userId = session.user.id;
+  const transactionRows = buildTransactionRows(state, userId);
+  if (transactionRows.length === 0) return;
+  await saveEntity(TRANSACTIONS, transactionRows, 'id');
+}
+
+/**
+ * Delete one transaction (manual referral) in Supabase.
+ */
+export async function deleteManualReferralInDb(transactionId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not authenticated');
+  const { error } = await supabase.from(TRANSACTIONS).delete().eq('id', transactionId).eq('user_id', session.user.id);
+  if (error) {
+    console.error('[supabaseSync] delete manual referral failed:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Persist full app state to Supabase. All 8 tables; injects user_id for RLS.
+ * Saves each table separately so one failure (e.g. room_financials UUID) does not block partners and others.
  */
 export async function saveState(state: AppState): Promise<void> {
   if (!isSupabaseConfigured()) return;
@@ -225,46 +346,42 @@ export async function saveState(state: AppState): Promise<void> {
     user_id: userId,
     amount: r.income ?? 0,
   }));
-  const costRows = state.costCatalog.map((m) =>
-    roomFinancialsRowForDb({
-      ...toSnake(costCatalogToRow(m) as Record<string, unknown>),
-      entity_type: ENTITY_COST_CATALOG,
-      user_id: userId,
-      amount: 0,
-    })
-  );
-  const hotelRows = state.hotelCosts.map((m) =>
-    roomFinancialsRowForDb({
-      ...toSnake(hotelCostToRow(m) as Record<string, unknown>),
-      type: 'hotel',
-      entity_type: ENTITY_HOTEL_COST,
-      user_id: userId,
-      unit_cost: 0,
-      default_qty: 1,
-    })
-  );
-  const roomFinancialsRows = [...costRows, ...hotelRows];
-  const partnerRows = state.partners.map((r) => ({
-    ...toSnake(partnerToRow(r) as Record<string, unknown>),
-    user_id: userId,
-    name: r.name ?? '',
-    type: r.type ?? 'other',
-    commission_type: r.commissionType ?? 'percentage',
-    commission_value: r.commissionValue ?? 0,
-    is_active: r.isActive ?? true,
-    phone: r.phone ?? '',
-    email: r.email ?? '',
-  }));
-  const transactionRows = state.manualReferrals.map((m) => ({
-    ...toSnake(manualReferralToRow(m) as Record<string, unknown>),
-    type: ENTITY_MANUAL_REFERRAL,
-    user_id: userId,
-    partner_id: m.partnerId ?? '',
-    guests_count: m.guestsCount ?? 0,
-    date: m.date ?? '',
-    commission_earned: m.commissionEarned ?? 0,
-    month_key: m.monthKey ?? '',
-  }));
+
+  const firstRoomId = state.rooms[0]?.id;
+  let roomFinancialsRows: Record<string, unknown>[] = [];
+  if (firstRoomId && isUUID(firstRoomId)) {
+    const costRows = state.costCatalog.map((m) =>
+      roomFinancialsRowForDb(
+        {
+          ...toSnake(costCatalogToRow(m) as Record<string, unknown>),
+          entity_type: ENTITY_COST_CATALOG,
+          user_id: userId,
+          amount: 0,
+        },
+        ENTITY_COST_CATALOG,
+        m.id,
+        firstRoomId
+      )
+    );
+    const hotelRows = state.hotelCosts.map((m) =>
+      roomFinancialsRowForDb(
+        {
+          ...toSnake(hotelCostToRow(m) as Record<string, unknown>),
+          type: 'hotel',
+          entity_type: ENTITY_HOTEL_COST,
+          user_id: userId,
+          unit_cost: 0,
+          default_qty: 1,
+        },
+        ENTITY_HOTEL_COST,
+        m.id,
+        firstRoomId
+      )
+    );
+    roomFinancialsRows = [...costRows, ...hotelRows];
+  }
+  const partnerRows = buildPartnerRows(state, userId);
+  const transactionRows = buildTransactionRows(state, userId);
   const monthlyRows = Object.values(state.monthLocks).map((m) => ({
     ...toSnake(monthLockToRow(m) as Record<string, unknown>),
     user_id: userId,
@@ -291,12 +408,28 @@ export async function saveState(state: AppState): Promise<void> {
     month_key: r.monthKey ?? '',
   }));
 
-  await saveEntity(ROOMS, roomRows, 'id');
-  await saveEntity(INCOME_RECORDS, bookingRows, 'id');
-  await saveEntity(ROOM_FINANCIALS, roomFinancialsRows, 'id');
-  await saveEntity(PARTNERS, partnerRows, 'id');
-  await saveEntity(TRANSACTIONS, transactionRows, 'id');
-  await saveEntity(MONTHLY_CONTROLS, monthlyRows, 'user_id,month_key');
-  await saveEntity(FORECAST_RECORDS, forecastRows, 'id');
-  await saveEntity(EXPENSE_RECORDS, expenseRows, 'id');
+  const tasks: { name: string; run: () => Promise<void> }[] = [
+    { name: ROOMS, run: () => saveEntity(ROOMS, roomRows, 'id') },
+    { name: INCOME_RECORDS, run: () => saveEntity(INCOME_RECORDS, bookingRows, 'id') },
+    { name: ROOM_FINANCIALS, run: () => saveEntity(ROOM_FINANCIALS, roomFinancialsRows, 'id') },
+    { name: PARTNERS, run: () => saveEntity(PARTNERS, partnerRows, 'id') },
+    { name: TRANSACTIONS, run: () => saveEntity(TRANSACTIONS, transactionRows, 'id') },
+    { name: MONTHLY_CONTROLS, run: () => saveEntity(MONTHLY_CONTROLS, monthlyRows, 'user_id,month_key') },
+    { name: FORECAST_RECORDS, run: () => saveEntity(FORECAST_RECORDS, forecastRows, 'id') },
+    { name: EXPENSE_RECORDS, run: () => saveEntity(EXPENSE_RECORDS, expenseRows, 'id') },
+  ];
+
+  const failed: string[] = [];
+  for (const { name, run } of tasks) {
+    try {
+      await run();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[supabaseSync] ${name} save failed:`, msg);
+      failed.push(name);
+    }
+  }
+  if (failed.length > 0) {
+    throw new Error(`Failed to save: ${failed.join(', ')}`);
+  }
 }

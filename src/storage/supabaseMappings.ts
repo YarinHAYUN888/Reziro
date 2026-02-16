@@ -139,7 +139,7 @@ export function partnerFromRow(row: Record<string, unknown>): Partner {
   const r = rowToApp(row) as Record<string, unknown>;
   return {
     id: String(r.id ?? ''),
-    name: String(r.name ?? ''),
+    name: String(r.name ?? r.businessName ?? r.business_name ?? ''),
     type: (r.type ?? 'other') as Partner['type'],
     phone: String(r.phone ?? ''),
     email: String(r.email ?? ''),

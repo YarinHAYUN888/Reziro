@@ -550,12 +550,9 @@ setMonthlyEmployeesExpense: (amount: number) =>
     set((state) => {
       const partners = [...state.partners, newPartner];
       const newState = { ...state, partners };
-      
       const storage = get().storage;
-      if (storage?.saveState) {
-        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
-      }
-      
+      if (storage?.savePartnersNow) storage.savePartnersNow(newState).catch((err) => console.error('❌ Partners save failed:', err));
+      if (storage?.saveState) storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       return newState;
     });
   },
@@ -580,12 +577,9 @@ setMonthlyEmployeesExpense: (amount: number) =>
           : partner
       );
       const newState = { ...state, partners };
-      
       const storage = get().storage;
-      if (storage?.saveState) {
-        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
-      }
-      
+      if (storage?.savePartnersNow) storage.savePartnersNow(newState).catch((err) => console.error('❌ Partners save failed:', err));
+      if (storage?.saveState) storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       return newState;
     });
   },
@@ -596,12 +590,9 @@ setMonthlyEmployeesExpense: (amount: number) =>
         partner.id === id ? { ...partner, isActive: !partner.isActive, updatedAt: new Date().toISOString() } : partner
       );
       const newState = { ...state, partners };
-      
       const storage = get().storage;
-      if (storage?.saveState) {
-        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
-      }
-      
+      if (storage?.savePartnersNow) storage.savePartnersNow(newState).catch((err) => console.error('❌ Partners save failed:', err));
+      if (storage?.saveState) storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       return newState;
     });
   },
@@ -610,12 +601,10 @@ setMonthlyEmployeesExpense: (amount: number) =>
     set((state) => {
       const partners = state.partners.filter((partner) => partner.id !== id);
       const newState = { ...state, partners };
-      
       const storage = get().storage;
-      if (storage?.saveState) {
-        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
-      }
-      
+      if (storage?.deletePartnerNow) storage.deletePartnerNow(id).catch((err) => console.error('❌ Delete partner failed:', err));
+      if (storage?.savePartnersNow) storage.savePartnersNow(newState).catch((err) => console.error('❌ Partners save failed:', err));
+      if (storage?.saveState) storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       return newState;
     });
   },
@@ -648,12 +637,9 @@ setMonthlyEmployeesExpense: (amount: number) =>
     set((state) => {
       const manualReferrals = [...state.manualReferrals, newReferral];
       const newState = { ...state, manualReferrals };
-      
       const storage = get().storage;
-      if (storage?.saveState) {
-        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
-      }
-      
+      if (storage?.saveManualReferralsNow) storage.saveManualReferralsNow(newState).catch((err) => console.error('❌ Referrals save failed:', err));
+      if (storage?.saveState) storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       return newState;
     });
   },
@@ -662,12 +648,10 @@ setMonthlyEmployeesExpense: (amount: number) =>
     set((state) => {
       const manualReferrals = state.manualReferrals.filter((r) => r.id !== id);
       const newState = { ...state, manualReferrals };
-      
       const storage = get().storage;
-      if (storage?.saveState) {
-        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
-      }
-      
+      if (storage?.deleteManualReferralNow) storage.deleteManualReferralNow(id).catch((err) => console.error('❌ Delete referral failed:', err));
+      if (storage?.saveManualReferralsNow) storage.saveManualReferralsNow(newState).catch((err) => console.error('❌ Referrals save failed:', err));
+      if (storage?.saveState) storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       return newState;
     });
   },

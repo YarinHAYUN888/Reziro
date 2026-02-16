@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 import type { AppState } from '../types/models';
 import type { StorageAdapter } from './LocalStorageAdapter';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { loadState, saveState } from './supabaseSync';
+import { loadState, saveState, savePartnersOnly, deletePartnerInDb, saveManualReferralsOnly, deleteManualReferralInDb } from './supabaseSync';
 
 function getEmptyState(): AppState {
   return {
@@ -39,15 +39,50 @@ export class SupabaseAdapter implements StorageAdapter {
     this.saveTimeout = setTimeout(() => {
       this.saveTimeout = null;
       saveState(state).catch((err) => {
-        const msg = typeof err === 'object' && err && 'message' in err
-          ? String((err as Error).message)
-          : String(err ?? '');
-        const isSchemaOrDbError = /room_financials|schema cache|column.*does not exist|could not find.*column|column.*in the schema|invalid input syntax for type uuid/i.test(msg);
+        const raw = typeof err === 'object' && err && 'message' in err ? (err as Error).message : err;
+        const msg = typeof raw === 'string' ? raw : String(raw ?? '');
+        const isSchemaOrDbError = /room_financials|schema cache|column.*does not exist|could not find.*column|column.*in the schema|discount_for_guests|invalid input syntax for type uuid/i.test(msg);
         console.error('SupabaseAdapter.saveState failed:', err);
         if (!isSchemaOrDbError) {
           toast.error(msg || 'Failed to save');
         }
       });
     }, this.debounceMs);
+  }
+
+  async savePartnersNow(state: AppState): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    savePartnersOnly(state).catch((err) => {
+      const msg = typeof (err && (err as { message?: unknown }).message) === 'string' ? (err as { message: string }).message : (err instanceof Error ? err.message : 'Failed to save partners');
+      console.error('SupabaseAdapter.savePartnersNow failed:', err);
+      toast.error(msg || 'Failed to save partners');
+    });
+  }
+
+  async deletePartnerNow(partnerId: string): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    deletePartnerInDb(partnerId).catch((err) => {
+      const msg = typeof (err && (err as { message?: unknown }).message) === 'string' ? (err as { message: string }).message : (err instanceof Error ? err.message : 'Failed to delete partner');
+      console.error('SupabaseAdapter.deletePartnerNow failed:', err);
+      toast.error(msg || 'Failed to delete partner');
+    });
+  }
+
+  async saveManualReferralsNow(state: AppState): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    saveManualReferralsOnly(state).catch((err) => {
+      const msg = typeof (err && (err as { message?: unknown }).message) === 'string' ? (err as { message: string }).message : (err instanceof Error ? err.message : 'Failed to save referral');
+      console.error('SupabaseAdapter.saveManualReferralsNow failed:', err);
+      toast.error(msg || 'Failed to save referral');
+    });
+  }
+
+  async deleteManualReferralNow(transactionId: string): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    deleteManualReferralInDb(transactionId).catch((err) => {
+      const msg = typeof (err && (err as { message?: unknown }).message) === 'string' ? (err as { message: string }).message : (err instanceof Error ? err.message : 'Failed to delete referral');
+      console.error('SupabaseAdapter.deleteManualReferralNow failed:', err);
+      toast.error(msg || 'Failed to delete referral');
+    });
   }
 }
