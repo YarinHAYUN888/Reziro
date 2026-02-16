@@ -88,7 +88,7 @@ export function bookingFromRow(row: Record<string, unknown>): Booking {
     weekOfMonth: (r.weekOfMonth ?? r.week_of_month ?? 1) as 1 | 2 | 3 | 4,
     pricePerNight: Number(r.pricePerNight ?? r.price_per_night ?? 0),
     nightsCount: Number(r.nightsCount ?? r.nights_count ?? 0),
-    income: Number(r.income ?? 0),
+    income: Number(r.income ?? r.amount ?? 0),
     extraExpenses: Number(r.extraExpenses ?? r.extra_expenses ?? 0),
     selectedRoomCosts: Array.isArray(selectedRoomCosts) ? selectedRoomCosts : [],
     selectedHotelCosts: Array.isArray(selectedHotelCosts) ? selectedHotelCosts : [],

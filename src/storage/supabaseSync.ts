@@ -54,7 +54,7 @@ const ALLOWED_COLUMNS: Record<TableName, readonly string[]> = {
   [ROOMS]: ['id', 'user_id', 'room_name', 'room_number', 'created_at'],
   [INCOME_RECORDS]: [
     'id', 'user_id', 'room_id', 'start_date', 'end_date', 'month_key', 'week_of_month',
-    'price_per_night', 'nights_count', 'income', 'extra_expenses',
+    'price_per_night', 'nights_count', 'income', 'amount', 'extra_expenses',
     'selected_room_costs', 'selected_hotel_costs', 'partner_referrals',
     'totals', 'metrics', 'customer', 'created_at', 'updated_at',
   ],
@@ -220,7 +220,11 @@ export async function saveState(state: AppState): Promise<void> {
   const userId = session.user.id;
 
   const roomRows = state.rooms.map((r) => ({ ...(roomToRow(r) as Record<string, unknown>), user_id: userId }));
-  const bookingRows = state.bookings.map((r) => ({ ...toSnake(bookingToRow(r) as Record<string, unknown>), user_id: userId }));
+  const bookingRows = state.bookings.map((r) => ({
+    ...toSnake(bookingToRow(r) as Record<string, unknown>),
+    user_id: userId,
+    amount: r.income ?? 0,
+  }));
   const costRows = state.costCatalog.map((m) =>
     roomFinancialsRowForDb({ ...toSnake(costCatalogToRow(m) as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG, user_id: userId })
   );
