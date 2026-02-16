@@ -341,11 +341,15 @@ export async function saveState(state: AppState): Promise<void> {
   const userId = session.user.id;
 
   const roomRows = state.rooms.map((r) => ({ ...(roomToRow(r) as Record<string, unknown>), user_id: userId }));
-  const bookingRows = state.bookings.map((r) => ({
-    ...toSnake(bookingToRow(r) as Record<string, unknown>),
-    user_id: userId,
-    amount: r.income ?? 0,
-  }));
+  const bookingRows = state.bookings.map((r) => {
+    const row = {
+      ...toSnake(bookingToRow(r) as Record<string, unknown>),
+      user_id: userId,
+      amount: r.income ?? 0,
+    };
+    const id = row.id != null && isUUID(String(row.id)) ? String(row.id) : crypto.randomUUID();
+    return { ...row, id };
+  });
 
   const firstRoomId = state.rooms[0]?.id;
   let roomFinancialsRows: Record<string, unknown>[] = [];
@@ -398,15 +402,19 @@ export async function saveState(state: AppState): Promise<void> {
     period: r.period ?? 'monthly',
     type: r.type ?? 'expense',
   }));
-  const expenseRows = state.expenses.map((r) => ({
-    ...toSnake(expenseToRow(r) as Record<string, unknown>),
-    user_id: userId,
-    type: r.type ?? 'custom',
-    description: r.description ?? '',
-    amount: r.amount ?? 0,
-    date: r.date ?? '',
-    month_key: r.monthKey ?? '',
-  }));
+  const expenseRows = state.expenses.map((r) => {
+    const row = {
+      ...toSnake(expenseToRow(r) as Record<string, unknown>),
+      user_id: userId,
+      type: r.type ?? 'custom',
+      description: r.description ?? '',
+      amount: r.amount ?? 0,
+      date: r.date ?? '',
+      month_key: r.monthKey ?? '',
+    };
+    const id = row.id != null && isUUID(String(row.id)) ? String(row.id) : crypto.randomUUID();
+    return { ...row, id };
+  });
 
   const tasks: { name: string; run: () => Promise<void> }[] = [
     { name: ROOMS, run: () => saveEntity(ROOMS, roomRows, 'id') },
