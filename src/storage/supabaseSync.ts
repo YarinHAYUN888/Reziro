@@ -290,17 +290,21 @@ export async function deletePartnerInDb(partnerId: string): Promise<void> {
 
 /** Build transaction rows for manual referrals (shared by saveManualReferralsOnly and saveState). */
 function buildTransactionRows(state: AppState, userId: string): Record<string, unknown>[] {
-  return state.manualReferrals.map((m) => ({
-    ...toSnake(manualReferralToRow(m) as Record<string, unknown>),
-    type: 'income' as const,
-    user_id: userId,
-    partner_id: m.partnerId ?? '',
-    guests_count: m.guestsCount ?? 0,
-    date: m.date ?? '',
-    commission_earned: m.commissionEarned ?? 0,
-    month_key: m.monthKey ?? '',
-    amount: m.commissionEarned ?? 0,
-  }));
+  return state.manualReferrals.map((m) => {
+    const row = {
+      ...toSnake(manualReferralToRow(m) as Record<string, unknown>),
+      type: 'income' as const,
+      user_id: userId,
+      partner_id: m.partnerId ?? '',
+      guests_count: m.guestsCount ?? 0,
+      date: m.date ?? '',
+      commission_earned: m.commissionEarned ?? 0,
+      month_key: m.monthKey ?? '',
+      amount: m.commissionEarned ?? 0,
+    };
+    const id = row.id != null && isUUID(String(row.id)) ? String(row.id) : crypto.randomUUID();
+    return { ...row, id };
+  });
 }
 
 /**
