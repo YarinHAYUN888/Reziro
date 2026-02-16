@@ -226,21 +226,70 @@ export async function saveState(state: AppState): Promise<void> {
     amount: r.income ?? 0,
   }));
   const costRows = state.costCatalog.map((m) =>
-    roomFinancialsRowForDb({ ...toSnake(costCatalogToRow(m) as Record<string, unknown>), entity_type: ENTITY_COST_CATALOG, user_id: userId })
+    roomFinancialsRowForDb({
+      ...toSnake(costCatalogToRow(m) as Record<string, unknown>),
+      entity_type: ENTITY_COST_CATALOG,
+      user_id: userId,
+      amount: 0,
+    })
   );
   const hotelRows = state.hotelCosts.map((m) =>
-    roomFinancialsRowForDb({ ...toSnake(hotelCostToRow(m) as Record<string, unknown>), type: 'hotel', entity_type: ENTITY_HOTEL_COST, user_id: userId })
+    roomFinancialsRowForDb({
+      ...toSnake(hotelCostToRow(m) as Record<string, unknown>),
+      type: 'hotel',
+      entity_type: ENTITY_HOTEL_COST,
+      user_id: userId,
+      unit_cost: 0,
+      default_qty: 1,
+    })
   );
   const roomFinancialsRows = [...costRows, ...hotelRows];
-  const partnerRows = state.partners.map((r) => ({ ...toSnake(partnerToRow(r) as Record<string, unknown>), user_id: userId }));
+  const partnerRows = state.partners.map((r) => ({
+    ...toSnake(partnerToRow(r) as Record<string, unknown>),
+    user_id: userId,
+    name: r.name ?? '',
+    type: r.type ?? 'other',
+    commission_type: r.commissionType ?? 'percentage',
+    commission_value: r.commissionValue ?? 0,
+    is_active: r.isActive ?? true,
+    phone: r.phone ?? '',
+    email: r.email ?? '',
+  }));
   const transactionRows = state.manualReferrals.map((m) => ({
     ...toSnake(manualReferralToRow(m) as Record<string, unknown>),
     type: ENTITY_MANUAL_REFERRAL,
     user_id: userId,
+    partner_id: m.partnerId ?? '',
+    guests_count: m.guestsCount ?? 0,
+    date: m.date ?? '',
+    commission_earned: m.commissionEarned ?? 0,
+    month_key: m.monthKey ?? '',
   }));
-  const monthlyRows = Object.values(state.monthLocks).map((m) => ({ ...toSnake(monthLockToRow(m) as Record<string, unknown>), user_id: userId }));
-  const forecastRows = state.forecasts.map((r) => ({ ...toSnake(forecastToRow(r) as Record<string, unknown>), user_id: userId }));
-  const expenseRows = state.expenses.map((r) => ({ ...toSnake(expenseToRow(r) as Record<string, unknown>), user_id: userId }));
+  const monthlyRows = Object.values(state.monthLocks).map((m) => ({
+    ...toSnake(monthLockToRow(m) as Record<string, unknown>),
+    user_id: userId,
+    month_key: m.monthKey ?? '',
+    is_locked: m.isLocked ?? false,
+  }));
+  const forecastRows = state.forecasts.map((r) => ({
+    ...toSnake(forecastToRow(r) as Record<string, unknown>),
+    user_id: userId,
+    month_key: r.monthKey ?? '',
+    category: r.category ?? '',
+    expected_amount: r.expectedAmount ?? 0,
+    confidence: r.confidence ?? 0,
+    period: r.period ?? 'monthly',
+    type: r.type ?? 'expense',
+  }));
+  const expenseRows = state.expenses.map((r) => ({
+    ...toSnake(expenseToRow(r) as Record<string, unknown>),
+    user_id: userId,
+    type: r.type ?? 'custom',
+    description: r.description ?? '',
+    amount: r.amount ?? 0,
+    date: r.date ?? '',
+    month_key: r.monthKey ?? '',
+  }));
 
   await saveEntity(ROOMS, roomRows, 'id');
   await saveEntity(INCOME_RECORDS, bookingRows, 'id');
