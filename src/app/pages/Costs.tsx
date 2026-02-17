@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '../components/layout/PageHeader';
+import { MonthSelector } from '../components/shared/MonthSelector';
 import { GlassCard } from '../components/shared/GlassCard';
 import { GlowButton } from '../components/shared/GlowButton';
 import { ConfirmDeleteDialog } from '../components/shared/ConfirmDeleteDialog';
 import { EditRoomCostDialog } from '../components/shared/EditRoomCostDialog';
+import { AddRoomCostDialog } from '../components/shared/AddRoomCostDialog';
 import { useAppStore } from '../../store/useAppStore';
 import { Plus, Edit2, Power, Trash2, Building2, Users, Zap, Droplet, Wrench, Sparkles, MoreHorizontal } from 'lucide-react';
 import {
@@ -21,6 +23,8 @@ import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 import type { HotelCost, CostCatalogItem } from '../../types/models';
+import { hotelCostMatchesPeriod, getPeriodKeyFromMonth, FREQUENCY_LABELS } from '../../utils/periodUtils';
+import type { HotelCostFrequency } from '../../types/models';
 
 const categoryIcons: Record<HotelCost['category'], any> = {
   employees: Users,
@@ -29,6 +33,7 @@ const categoryIcons: Record<HotelCost['category'], any> = {
   water: Droplet,
   maintenance: Wrench,
   cleaning: Sparkles,
+  room_rent: Building2,
   other: MoreHorizontal,
 };
 
@@ -39,6 +44,7 @@ const categoryLabels: Record<HotelCost['category'], string> = {
   water: 'מים',
   maintenance: 'תחזוקה',
   cleaning: 'ניקיון',
+  room_rent: 'שכירות חדר',
   other: 'אחר',
 };
 
@@ -49,6 +55,7 @@ const categoryColors: Record<HotelCost['category'], string> = {
   water: 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10',
   maintenance: 'text-orange-400 border-orange-400/30 bg-orange-400/10',
   cleaning: 'text-green-400 border-green-400/30 bg-green-400/10',
+  room_rent: 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10',
   other: 'text-gray-400 border-gray-400/30 bg-gray-400/10',
 };
 
@@ -56,14 +63,22 @@ export function Costs() {
   const { t } = useTranslation();
   const costCatalog = useAppStore((state) => state.costCatalog);
   const hotelCosts = useAppStore((state) => state.hotelCosts);
+  const selectedMonthKey = useAppStore((state) => state.selectedMonthKey);
   const addHotelCost = useAppStore((state) => state.addHotelCost);
   const updateHotelCost = useAppStore((state) => state.updateHotelCost);
   const toggleHotelCostActive = useAppStore((state) => state.toggleHotelCostActive);
   const deleteHotelCost = useAppStore((state) => state.deleteHotelCost);
   const updateCostCatalogItem = useAppStore((state) => state.updateCostCatalogItem);
   const deleteCostCatalogItem = useAppStore((state) => state.deleteCostCatalogItem);
+  const addCostCatalogItem = useAppStore((state) => state.addCostCatalogItem);
+  const rooms = useAppStore((state) => state.rooms);
+  const storage = useAppStore((state) => state.storage);
+
+  const hotelCostsForPeriod = hotelCosts.filter((c) => hotelCostMatchesPeriod(c, selectedMonthKey));
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [addRoomCostDialogOpen, setAddRoomCostDialogOpen] = useState(false);
+  const [addRoomCostLoading, setAddRoomCostLoading] = useState(false);
   const [roomCostEditDialogOpen, setRoomCostEditDialogOpen] = useState(false);
   const [editingRoomCost, setEditingRoomCost] = useState<CostCatalogItem | null>(null);
   const [hotelCostDeleteDialogOpen, setHotelCostDeleteDialogOpen] = useState(false);
@@ -74,11 +89,12 @@ export function Costs() {
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState(0);
   const [category, setCategory] = useState<HotelCost['category']>('other');
+  const [frequencyType, setFrequencyType] = useState<HotelCostFrequency>('monthly');
 
   const roomCosts = costCatalog.filter(
     (c) => c.type === 'room'
   );  
-  const totalMonthlyHotelCosts = hotelCosts
+  const totalMonthlyHotelCosts = hotelCostsForPeriod
     .filter((c) => c.isActive)
     .reduce((sum, c) => sum + c.amount, 0);
 
@@ -88,11 +104,13 @@ export function Costs() {
       setLabel(cost.label);
       setAmount(cost.amount);
       setCategory(cost.category);
+      setFrequencyType(cost.frequencyType ?? 'monthly');
     } else {
       setEditingCost(null);
       setLabel('');
       setAmount(0);
       setCategory('other');
+      setFrequencyType('monthly');
     }
     setDialogOpen(true);
   };
@@ -107,7 +125,8 @@ export function Costs() {
       updateHotelCost(editingCost.id, { label, amount, category });
       toast.success('✅ עלות עודכנה בהצלחה!');
     } else {
-      addHotelCost({ label, amount, category });
+      const periodKey = getPeriodKeyFromMonth(selectedMonthKey, frequencyType);
+      addHotelCost({ label, amount, category, frequencyType, periodKey });
       toast.success('✅ עלות נוספה בהצלחה!');
     }
 
@@ -157,11 +176,42 @@ export function Costs() {
     }
   };
 
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const handleAddRoomCostSave = async (data: { label: string; unitCost: number; defaultQty: number }) => {
+    const firstRoomId = rooms[0]?.id;
+    if (!firstRoomId || !UUID_REGEX.test(firstRoomId)) {
+      toast.error('צור לפחות חדר אחד לפני הוספת עלות חדר');
+      return;
+    }
+    const item: CostCatalogItem = {
+      id: crypto.randomUUID(),
+      type: 'room',
+      label: data.label,
+      unitCost: data.unitCost,
+      defaultQty: data.defaultQty,
+      isActive: true,
+    };
+    setAddRoomCostLoading(true);
+    try {
+      if (storage?.addRoomCostNow) {
+        await storage.addRoomCostNow(item, firstRoomId);
+      }
+      addCostCatalogItem(item);
+      toast.success('✅ עלות חדר נוספה בהצלחה!');
+      setAddRoomCostDialogOpen(false);
+    } catch {
+      // toast already shown by adapter
+    } finally {
+      setAddRoomCostLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
         title="עלויות חדר ומלון"
         description="ניהול עלויות לפי חדר ועלויות כלליות למלון"
+        action={<MonthSelector />}
       />
 
       <div className="container mx-auto px-4 lg:px-8 xl:px-12 2xl:px-16 max-w-[2200px]">
@@ -178,6 +228,15 @@ export function Costs() {
                   עלויות שמוחלות לכל הזמנה בנפרד
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setAddRoomCostDialogOpen(true)}
+                className="inline-flex items-center justify-center w-11 h-11 rounded-full glass-card border border-primary/30 hover:border-primary/50 hover:bg-primary/10 text-primary transition-all duration-200 hover:scale-105 shadow-[0_0_15px_rgba(124,255,58,0.2)] hover:shadow-[0_0_25px_rgba(124,255,58,0.4)]"
+                aria-label="הוסף עלות"
+                title="הוסף עלות"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
             </div>
             
 
@@ -220,6 +279,12 @@ export function Costs() {
                 ))}
               </div>
             )}
+            <AddRoomCostDialog
+              open={addRoomCostDialogOpen}
+              onOpenChange={setAddRoomCostDialogOpen}
+              onSave={handleAddRoomCostSave}
+              isLoading={addRoomCostLoading}
+            />
           </GlassCard>
 
           {/* Hotel Costs Section */}
@@ -248,7 +313,7 @@ export function Costs() {
               </div>
             </div>
 
-            {hotelCosts.length === 0 ? (
+            {hotelCostsForPeriod.length === 0 ? (
               <div className="text-center py-20">
                 <Building2 className="w-16 h-16 text-primary/30 mx-auto mb-4" />
                 <p className="text-xl text-muted-foreground mb-2">אין עלויות מלון</p>
@@ -256,7 +321,7 @@ export function Costs() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {hotelCosts.map((cost) => {
+                {hotelCostsForPeriod.map((cost) => {
                   const Icon = categoryIcons[cost.category];
                   const colorClass = categoryColors[cost.category];
                   
@@ -298,9 +363,9 @@ export function Costs() {
                       <h3 className="text-lg font-bold text-foreground mb-1">{cost.label}</h3>
                       <p className="text-xs text-muted-foreground mb-3">{categoryLabels[cost.category]}</p>
                       
-                      <div className="flex items-baseline justify-between">
+                      <div className="flex flex-col gap-0.5">
                         <span className="text-2xl font-bold text-primary">₪{cost.amount.toFixed(2)}</span>
-                        <span className="text-xs text-muted-foreground">/חודש</span>
+                        <span className="text-xs text-muted-foreground opacity-80">{FREQUENCY_LABELS[cost.frequencyType ?? 'monthly']}</span>
                       </div>
                     </div>
                   );
@@ -366,6 +431,28 @@ export function Costs() {
                 </SelectContent>
               </Select>
             </div>
+
+            {!editingCost && (
+              <div className="space-y-2">
+                <Label className="text-foreground font-semibold">תדירות</Label>
+                <div className="flex gap-2 p-1 rounded-xl glass-card border border-primary/20">
+                  {(['monthly', 'quarterly', 'yearly'] as const).map((freq) => (
+                    <button
+                      key={freq}
+                      type="button"
+                      onClick={() => setFrequencyType(freq)}
+                      className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        frequencyType === freq
+                          ? 'bg-primary/20 text-primary border border-primary/40 shadow-[0_0_12px_rgba(124,255,58,0.2)]'
+                          : 'text-muted-foreground hover:bg-primary/10 hover:text-primary border border-transparent'
+                      }`}
+                    >
+                      {FREQUENCY_LABELS[freq]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-3">

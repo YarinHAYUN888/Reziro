@@ -4,7 +4,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { AppState } from '../types/models';
+import type { AppState, CostCatalogItem } from '../types/models';
 import {
   roomFromRow,
   bookingFromRow,
@@ -29,6 +29,7 @@ import {
 const ROOMS = 'rooms';
 const INCOME_RECORDS = 'income_records';
 const ROOM_FINANCIALS = 'room_financials';
+const HOTEL_COSTS = 'hotel_costs';
 const PARTNERS = 'partners';
 const TRANSACTIONS = 'transactions';
 const MONTHLY_CONTROLS = 'monthly_controls';
@@ -43,6 +44,7 @@ type TableName =
   | typeof ROOMS
   | typeof INCOME_RECORDS
   | typeof ROOM_FINANCIALS
+  | typeof HOTEL_COSTS
   | typeof PARTNERS
   | typeof TRANSACTIONS
   | typeof MONTHLY_CONTROLS
@@ -59,6 +61,7 @@ const ALLOWED_COLUMNS: Record<TableName, readonly string[]> = {
     'totals', 'metrics', 'customer', 'created_at', 'updated_at',
   ],
   [ROOM_FINANCIALS]: ['id', 'user_id', 'room_id', 'type', 'entity_type', 'label', 'unit_cost', 'default_qty', 'is_active', 'category', 'amount', 'created_at', 'updated_at'],
+  [HOTEL_COSTS]: ['id', 'user_id', 'category', 'label', 'amount', 'frequency_type', 'period_key', 'is_active', 'created_at', 'updated_at'],
   [PARTNERS]: [
     'id', 'user_id', 'name', 'business_name', 'type', 'phone', 'email', 'commission_type', 'commission_value',
     'is_active', 'created_at', 'updated_at',
@@ -147,6 +150,34 @@ export function saveEntity(
 }
 
 /**
+ * Insert one room cost (cost_catalog) into room_financials. Used when user adds a custom room cost.
+ * RLS ensures user_id = auth.uid(). Requires firstRoomId (user must have at least one room).
+ */
+export async function insertRoomCostInDb(firstRoomId: string, item: CostCatalogItem): Promise<void> {
+  if (!isSupabaseConfigured()) throw new Error('Supabase not configured');
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not authenticated');
+  const userId = session.user.id;
+  const row = roomFinancialsRowForDb(
+    {
+      ...toSnake(costCatalogToRow(item) as Record<string, unknown>),
+      entity_type: ENTITY_COST_CATALOG,
+      user_id: userId,
+      amount: 0,
+    },
+    ENTITY_COST_CATALOG,
+    item.id,
+    firstRoomId
+  );
+  const sanitized = sanitizeRow(ROOM_FINANCIALS, row as Record<string, unknown>);
+  const { error } = await supabase.from(ROOM_FINANCIALS).insert(sanitized);
+  if (error) {
+    console.error('[supabaseSync] insert room cost failed:', error.message);
+    throw error;
+  }
+}
+
+/**
  * Delete room rows that exist in DB for this user but are not in current state (sync deletions).
  * RLS ensures only own rows are visible/deletable. Must be awaited before upserting rooms.
  */
@@ -194,10 +225,11 @@ export async function loadState(): Promise<AppState> {
   if (!session?.user) throw new Error('Not authenticated');
   const userId = session.user.id;
   try {
-    const [roomsData, incomeData, roomFinancialsData, partnersData, transactionsData, monthlyData, forecastsData, expensesData] = await Promise.all([
+    const [roomsData, incomeData, roomFinancialsData, hotelCostsData, partnersData, transactionsData, monthlyData, forecastsData, expensesData] = await Promise.all([
       supabase.from(ROOMS).select('*').eq('user_id', userId),
       supabase.from(INCOME_RECORDS).select('*').eq('user_id', userId),
       supabase.from(ROOM_FINANCIALS).select('*').eq('user_id', userId),
+      supabase.from(HOTEL_COSTS).select('*').eq('user_id', userId),
       supabase.from(PARTNERS).select('*').eq('user_id', userId),
       supabase.from(TRANSACTIONS).select('*').eq('user_id', userId),
       supabase.from(MONTHLY_CONTROLS).select('*').eq('user_id', userId),
@@ -207,6 +239,7 @@ export async function loadState(): Promise<AppState> {
     if (roomsData.error) throw roomsData.error;
     if (incomeData.error) throw incomeData.error;
     if (roomFinancialsData.error) throw roomFinancialsData.error;
+    if (hotelCostsData.error) throw hotelCostsData.error;
     if (partnersData.error) throw partnersData.error;
     if (transactionsData.error) throw transactionsData.error;
     if (monthlyData.error) throw monthlyData.error;
@@ -219,9 +252,7 @@ export async function loadState(): Promise<AppState> {
     const costCatalog = roomFinancials
       .filter((r) => (r.entity_type ?? r.entityType) === ENTITY_COST_CATALOG)
       .map((r) => costCatalogFromRow(r));
-    const hotelCosts = roomFinancials
-      .filter((r) => (r.entity_type ?? r.entityType) === ENTITY_HOTEL_COST)
-      .map((r) => hotelCostFromRow(r));
+    const hotelCosts = (hotelCostsData.data ?? []).map((r) => hotelCostFromRow(r as Record<string, unknown>));
     const partners = (partnersData.data ?? []).map((r) => partnerFromRow(r as Record<string, unknown>));
     const manualReferrals = (transactionsData.data ?? [])
       .filter((r: Record<string, unknown>) => {
@@ -412,23 +443,12 @@ export async function saveState(state: AppState): Promise<void> {
         firstRoomId
       )
     );
-    const hotelRows = state.hotelCosts.map((m) =>
-      roomFinancialsRowForDb(
-        {
-          ...toSnake(hotelCostToRow(m) as Record<string, unknown>),
-          type: 'hotel',
-          entity_type: ENTITY_HOTEL_COST,
-          user_id: userId,
-          unit_cost: 0,
-          default_qty: 1,
-        },
-        ENTITY_HOTEL_COST,
-        m.id,
-        firstRoomId
-      )
-    );
-    roomFinancialsRows = [...costRows, ...hotelRows];
+    roomFinancialsRows = costRows;
   }
+  const hotelCostRows = state.hotelCosts.map((m) => ({
+    ...toSnake(hotelCostToRow(m) as Record<string, unknown>),
+    user_id: userId,
+  }));
   const partnerRows = buildPartnerRows(state, userId);
   const transactionRows = buildTransactionRows(state, userId);
   const monthlyRows = Object.values(state.monthLocks).map((m) => ({
@@ -472,6 +492,7 @@ export async function saveState(state: AppState): Promise<void> {
     },
     { name: INCOME_RECORDS, run: () => saveEntity(INCOME_RECORDS, bookingRows, 'id') },
     { name: ROOM_FINANCIALS, run: () => saveEntity(ROOM_FINANCIALS, roomFinancialsRows, 'id') },
+    { name: HOTEL_COSTS, run: () => saveEntity(HOTEL_COSTS, hotelCostRows, 'id') },
     { name: PARTNERS, run: () => saveEntity(PARTNERS, partnerRows, 'id') },
     { name: TRANSACTIONS, run: () => saveEntity(TRANSACTIONS, transactionRows, 'id') },
     { name: MONTHLY_CONTROLS, run: () => saveEntity(MONTHLY_CONTROLS, monthlyRows, 'user_id,month_key') },

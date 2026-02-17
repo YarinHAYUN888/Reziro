@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../components/ui/badge';
 import { ConfirmDeleteDialog } from '../components/shared/ConfirmDeleteDialog';
 import { toast } from 'sonner';
+import { hotelCostMatchesPeriod } from '../../utils/periodUtils';
 
 export function Financial() {
   const selectedMonthKey = useAppStore((state) => state.selectedMonthKey);
@@ -38,9 +39,9 @@ export function Financial() {
 
   const monthlyHotelCosts = useMemo(() => {
     return hotelCosts
-      .filter((c) => c.isActive)
+      .filter((c) => c.isActive && hotelCostMatchesPeriod(c, selectedMonthKey))
       .reduce((sum, c) => sum + c.amount, 0);
-  }, [hotelCosts]);
+  }, [hotelCosts, selectedMonthKey]);
 
   const totalIncome = useMemo(() => {
     return monthBookings.reduce((sum, b) => sum + b.income, 0);

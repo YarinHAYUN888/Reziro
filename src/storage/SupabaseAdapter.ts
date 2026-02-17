@@ -2,7 +2,8 @@ import { toast } from 'sonner';
 import type { AppState } from '../types/models';
 import type { StorageAdapter } from './LocalStorageAdapter';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { loadState, saveState, savePartnersOnly, deletePartnerInDb, saveManualReferralsOnly, deleteManualReferralInDb, deleteExpenseInDb } from './supabaseSync';
+import { loadState, saveState, savePartnersOnly, deletePartnerInDb, saveManualReferralsOnly, deleteManualReferralInDb, deleteExpenseInDb, insertRoomCostInDb } from './supabaseSync';
+import type { CostCatalogItem } from '../types/models';
 
 function getEmptyState(): AppState {
   return {
@@ -93,5 +94,17 @@ export class SupabaseAdapter implements StorageAdapter {
       console.error('SupabaseAdapter.deleteExpenseNow failed:', err);
       toast.error(msg || 'Failed to delete expense');
     });
+  }
+
+  async addRoomCostNow(item: CostCatalogItem, firstRoomId: string): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    try {
+      await insertRoomCostInDb(firstRoomId, item);
+    } catch (err) {
+      const msg = typeof (err && (err as { message?: unknown }).message) === 'string' ? (err as { message: string }).message : (err instanceof Error ? err.message : 'Failed to add cost');
+      console.error('SupabaseAdapter.addRoomCostNow failed:', err);
+      toast.error(msg || 'Failed to add cost');
+      throw err;
+    }
   }
 }

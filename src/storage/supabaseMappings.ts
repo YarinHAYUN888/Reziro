@@ -124,12 +124,15 @@ export function costCatalogFromRow(row: Record<string, unknown>): CostCatalogIte
 
 export function hotelCostFromRow(row: Record<string, unknown>): HotelCost {
   const r = rowToApp(row) as Record<string, unknown>;
+  const freq = (r.frequencyType ?? r.frequency_type ?? 'monthly') as HotelCost['frequencyType'];
   return {
     id: String(r.id ?? ''),
     label: String(r.label ?? ''),
     amount: Number(r.amount ?? 0),
     category: (r.category ?? 'other') as HotelCost['category'],
     isActive: Boolean(r.isActive ?? r.is_active ?? true),
+    frequencyType: freq === 'quarterly' || freq === 'yearly' ? freq : 'monthly',
+    periodKey: String(r.periodKey ?? r.period_key ?? ''),
     createdAt: String(r.createdAt ?? r.created_at ?? ''),
     updatedAt: r.updatedAt != null || r.updated_at != null ? String(r.updatedAt ?? r.updated_at) : undefined,
   };
@@ -264,6 +267,8 @@ export function hotelCostToRow(m: HotelCost): Record<string, unknown> {
     amount: m.amount,
     category: m.category,
     isActive: m.isActive,
+    frequencyType: m.frequencyType ?? 'monthly',
+    periodKey: m.periodKey ?? '',
     createdAt: m.createdAt,
     updatedAt: m.updatedAt ?? null,
   });

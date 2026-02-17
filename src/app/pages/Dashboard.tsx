@@ -15,6 +15,7 @@ import { Input } from '../components/ui/input';
 import { GlowButton } from '../components/shared/GlowButton';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
+import { hotelCostMatchesPeriod } from '../../utils/periodUtils';
 
 interface ProfitTrendDataPoint {
   month: string;
@@ -56,7 +57,7 @@ export function Dashboard() {
   const monthExpenses = expenses.filter((e) => e.monthKey === selectedMonthKey);
   
   const monthlyHotelCosts = hotelCosts
-    .filter((c) => c.isActive)
+    .filter((c) => c.isActive && hotelCostMatchesPeriod(c, selectedMonthKey))
     .reduce((sum, c) => sum + c.amount, 0);
   
   const totalIncome = monthBookings.reduce((sum, b) => sum + b.income, 0);

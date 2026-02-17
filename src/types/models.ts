@@ -99,12 +99,16 @@ export interface Expense {
   updatedAt: string;
 }
 
+export type HotelCostFrequency = 'monthly' | 'quarterly' | 'yearly';
+
 export interface HotelCost {
   id: string;
   label: string;
   amount: number;
-  category: 'employees' | 'arnona' | 'electricity' | 'water' | 'maintenance' | 'cleaning' | 'other';
+  category: 'employees' | 'arnona' | 'electricity' | 'water' | 'maintenance' | 'cleaning' | 'room_rent' | 'other';
   isActive: boolean;
+  frequencyType: HotelCostFrequency;
+  periodKey: string;
   createdAt: string;
   updatedAt?: string;
 }

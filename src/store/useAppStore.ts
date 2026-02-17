@@ -56,14 +56,15 @@ setMonthlyEmployeesExpense: (amount: number) => void;
     type?: 'income' | 'expense';
   }) => void;  
   deleteExpense: (id: string) => void;
-  addHotelCost: (data: { label: string; amount: number; category: HotelCost['category'] }) => void;
+  addHotelCost: (data: { label: string; amount: number; category: HotelCost['category']; frequencyType?: HotelCost['frequencyType']; periodKey?: string }) => void;
   updateHotelCost: (id: string, data: { label: string; amount: number; category: HotelCost['category'] }) => void;
   toggleHotelCostActive: (id: string) => void;
   deleteHotelCost: (id: string) => void;
 
   updateCostCatalogItem: (id: string, data: { label?: string; unitCost?: number; defaultQty?: number; isActive?: boolean }) => void;
   deleteCostCatalogItem: (id: string) => void;
-  
+  addCostCatalogItem: (item: CostCatalogItem) => void;
+
   // 🆕 NEW: Partner functions
   addPartner: (data: { 
     name: string; 
@@ -427,12 +428,17 @@ setMonthlyEmployeesExpense: (amount: number) =>
   },
 
   addHotelCost: (data) => {
+    const selectedMonthKey = get().selectedMonthKey;
+    const frequencyType = data.frequencyType ?? 'monthly';
+    const periodKey = data.periodKey ?? (frequencyType === 'yearly' ? selectedMonthKey.slice(0, 4) : frequencyType === 'quarterly' ? `${selectedMonthKey.slice(0, 4)}-Q${Math.ceil(parseInt(selectedMonthKey.slice(5, 7), 10) / 3)}` : selectedMonthKey);
     const newHotelCost: HotelCost = {
       id: crypto.randomUUID(),
       label: data.label,
       amount: data.amount,
       category: data.category,
       isActive: true,
+      frequencyType,
+      periodKey,
       createdAt: new Date().toISOString(),
     };
 
@@ -531,6 +537,18 @@ setMonthlyEmployeesExpense: (amount: number) =>
         storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
       }
 
+      return newState;
+    });
+  },
+
+  addCostCatalogItem: (item) => {
+    set((state) => {
+      const costCatalog = [...state.costCatalog, item];
+      const newState = { ...state, costCatalog };
+      const storage = get().storage;
+      if (storage?.saveState) {
+        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
+      }
       return newState;
     });
   },

@@ -13,4 +13,6 @@ export interface StorageAdapter {
   deleteManualReferralNow?(transactionId: string): Promise<void>;
   /** Optional: delete one expense in DB (Supabase). */
   deleteExpenseNow?(expenseId: string): Promise<void>;
+  /** Optional: insert one room cost into DB (Supabase). */
+  addRoomCostNow?(item: import('../types/models').CostCatalogItem, firstRoomId: string): Promise<void>;
 }
