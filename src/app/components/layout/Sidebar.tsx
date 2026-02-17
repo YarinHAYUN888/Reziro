@@ -67,7 +67,7 @@ export function Sidebar() {
         alt="Reziro"
         className="h-25 object-contain"
       />
-        <p className="text-sm text-muted-foreground mt-2 font-semibold" dir="rtl">{greeting}</p>
+        <p className="text-sm text-muted-foreground mt-2 font-bold" dir="rtl">{greeting}</p>
       </div>
 
       <nav className="space-y-2 flex-1">

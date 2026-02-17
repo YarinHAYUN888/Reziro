@@ -532,7 +532,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                 <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-bold text-destructive mb-1">{t('rooms.dateConflictTitle')}</p>
-                  <p className="text-xs text-destructive/90">{t('rooms.dateConflict')}</p>
+                  <p className="text-xs font-bold text-destructive/90">{t('rooms.dateConflict')}</p>
                 </div>
               </div>
             )}
