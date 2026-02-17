@@ -349,7 +349,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="glass-card border-primary/30 shadow-[0_0_40px_rgba(124,255,58,0.2)] w-[95vw] sm:w-[90vw] max-w-7xl h-[95vh] overflow-y-auto p-4 sm:p-6 md:p-8">
+      <DialogContent className="glass-card border-primary/30 shadow-[0_0_40px_rgba(124,255,58,0.2)] w-[95vw] sm:w-[90vw] max-w-[1400px] h-[95vh] overflow-y-auto p-4 sm:p-6 md:p-8 mx-auto">
         <DialogHeader className="text-center mb-6">
           <DialogTitle className="text-3xl sm:text-4xl md:text-5xl font-bold text-primary drop-shadow-[0_0_15px_rgba(124,255,58,0.6)]">
             {viewMode === 'list' ? 'רשימת הזמנות' : currentBookingId ? t('booking.edit') : t('booking.create')}
@@ -708,41 +708,41 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
 
             <Separator className="bg-primary/30" />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="glass-card border-primary/30 p-5 rounded-2xl text-center space-y-2">
-                <p className="text-muted-foreground text-sm">{t('booking.nights')}</p>
-                <p className="text-3xl font-bold text-foreground">{nights}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 min-w-0">
+              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.nights')}</p>
+                <p className="text-xl sm:text-2xl font-bold text-foreground leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center">{nights}</p>
               </div>
 
-              <div className="glass-card border-primary/30 p-5 rounded-2xl text-center space-y-2">
-                <p className="text-muted-foreground text-sm">{t('booking.income')}</p>
-                <p className="text-3xl font-bold text-primary" dir="ltr">₪{income.toFixed(2)}</p>
+              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.income')}</p>
+                <p className="text-xl sm:text-2xl font-bold text-primary leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center" dir="ltr">₪{Number(income).toFixed(2)}</p>
               </div>
 
-              <div className="glass-card border-primary/30 p-5 rounded-2xl text-center space-y-2">
-                <p className="text-muted-foreground text-sm">{t('booking.roomCosts')}</p>
-                <p className="text-xl font-semibold text-destructive" dir="ltr">-₪{totalRoomCosts.toFixed(2)}</p>
+              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.roomCosts')}</p>
+                <p className="text-xl sm:text-2xl font-bold text-destructive leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center" dir="ltr">-₪{Number(totalRoomCosts).toFixed(2)}</p>
               </div>
 
-              <div className="glass-card border-primary/30 p-5 rounded-2xl text-center space-y-2">
-                <p className="text-muted-foreground text-sm">הכנסות משותפים</p>
-                <p className="text-xl font-semibold text-primary" dir="ltr">+₪{totalPartnerRevenue.toFixed(2)}</p>
+              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">הכנסות משותפים</p>
+                <p className="text-xl sm:text-2xl font-bold text-primary leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center" dir="ltr">+₪{Number(totalPartnerRevenue).toFixed(2)}</p>
               </div>
 
-              <div className="glass-card border-primary/30 p-5 rounded-2xl text-center space-y-3">
-                <p className="text-muted-foreground text-sm">{t('booking.extraExpenses')}</p>
+              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.extraExpenses')}</p>
                 <Input
                   type="number"
                   value={extraExpenses}
                   onChange={(e) => setExtraExpenses(Number(e.target.value))}
-                  className="glass-card border-primary/30 text-center"
+                  className="glass-card border-primary/30 text-center w-full max-w-[120px] h-9 text-sm"
                   placeholder="0"
                 />
               </div>
 
-              <div className="glass-card border-primary/50 p-6 rounded-2xl text-center space-y-2 bg-gradient-to-br from-primary/10 to-transparent shadow-[0_0_25px_rgba(124,255,58,0.25)] sm:col-span-2 lg:col-span-3">
-                <p className="text-muted-foreground text-sm">{t('booking.netProfit')}</p>
-                <p className="text-4xl font-bold text-primary" dir="ltr">₪{netProfit.toFixed(2)}</p>
+              <div className="glass-card border-primary/50 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1 bg-gradient-to-br from-primary/10 to-transparent shadow-[0_0_25px_rgba(124,255,58,0.25)] sm:col-span-2 lg:col-span-3">
+                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.netProfit')}</p>
+                <p className="text-xl sm:text-2xl font-bold text-primary leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center" dir="ltr">₪{Number(netProfit).toFixed(2)}</p>
               </div>
             </div>
 
