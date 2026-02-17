@@ -146,6 +146,33 @@ export function saveEntity(
     });
 }
 
+/**
+ * Delete room rows that exist in DB for this user but are not in current state (sync deletions).
+ * RLS ensures only own rows are visible/deletable. Must be awaited before upserting rooms.
+ */
+async function deleteRoomsNotInState(userId: string, stateRoomIds: Set<string>): Promise<void> {
+  const { data, error: fetchError } = await supabase
+    .from(ROOMS)
+    .select('id')
+    .eq('user_id', userId);
+  if (fetchError) {
+    console.error('[supabaseSync] rooms fetch for sync-delete failed:', fetchError.message);
+    throw fetchError;
+  }
+  const existingIds = (data ?? []).map((r: { id: string }) => r.id);
+  const toDelete = existingIds.filter((id) => !stateRoomIds.has(id));
+  if (toDelete.length === 0) return;
+  const { error: deleteError } = await supabase
+    .from(ROOMS)
+    .delete()
+    .eq('user_id', userId)
+    .in('id', toDelete);
+  if (deleteError) {
+    console.error('[supabaseSync] rooms delete (sync) failed:', deleteError.message);
+    throw deleteError;
+  }
+}
+
 const EMPTY_STATE: AppState = {
   rooms: [],
   bookings: [],
@@ -434,8 +461,15 @@ export async function saveState(state: AppState): Promise<void> {
     return { ...row, id };
   });
 
+  const stateRoomIds = new Set(state.rooms.map((r) => r.id));
   const tasks: { name: string; run: () => Promise<void> }[] = [
-    { name: ROOMS, run: () => saveEntity(ROOMS, roomRows, 'id') },
+    {
+      name: ROOMS,
+      run: async () => {
+        await deleteRoomsNotInState(userId, stateRoomIds);
+        await saveEntity(ROOMS, roomRows, 'id');
+      },
+    },
     { name: INCOME_RECORDS, run: () => saveEntity(INCOME_RECORDS, bookingRows, 'id') },
     { name: ROOM_FINANCIALS, run: () => saveEntity(ROOM_FINANCIALS, roomFinancialsRows, 'id') },
     { name: PARTNERS, run: () => saveEntity(PARTNERS, partnerRows, 'id') },
