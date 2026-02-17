@@ -14,13 +14,14 @@ import { Financial } from './pages/Financial';
 import { Admin } from './pages/Admin';
 import Partners from './pages/Partners';
 import { useAppStore } from '../store/useAppStore';
-import { getSession, onAuthStateChange, ensureProfile } from '../lib/auth';
+import { getSession, onAuthStateChange, ensureProfile, loadProfile } from '../lib/auth';
 import { DEFAULT_ROOM_COSTS } from '../data/defaultRoomCosts';
 import i18n from '../i18n/config';
 
 export default function App() {
   const isHydrated = useAppStore((state) => state.isHydrated);
   const setUser = useAppStore((state) => state.setUser);
+  const setProfile = useAppStore((state) => state.setProfile);
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -29,13 +30,25 @@ export default function App() {
     document.documentElement.dir = currentLang === 'he' ? 'rtl' : 'ltr';
     document.documentElement.lang = currentLang;
 
-    getSession().then((user) => {
+    getSession().then(async (user) => {
       setUser(user);
-      if (!user) useAppStore.setState({ isHydrated: true });
+      if (!user) {
+        setProfile(null);
+        useAppStore.setState({ isHydrated: true });
+      } else {
+        const profile = await loadProfile(user.id);
+        setProfile(profile);
+      }
     });
 
-    const unsubscribe = onAuthStateChange((user) => {
+    const unsubscribe = onAuthStateChange(async (user) => {
       setUser(user);
+      if (!user) {
+        setProfile(null);
+      } else {
+        const profile = await loadProfile(user.id);
+        setProfile(profile);
+      }
       if (user) {
         ensureProfile(user).catch(() => {});
         const storage = useAppStore.getState().storage;
@@ -62,7 +75,7 @@ export default function App() {
     });
 
     return unsubscribe;
-  }, [setUser]);
+  }, [setUser, setProfile]);
 
   if (!isHydrated) {
     return <LoadingScreen />;

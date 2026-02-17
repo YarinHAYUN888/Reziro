@@ -29,18 +29,42 @@ export async function signOut() {
   await supabase.auth.signOut();
 }
 
+export type ProfilePayload = {
+  first_name?: string;
+  last_name?: string;
+  hotel_role?: string;
+};
+
 /** Ensure a row exists in public.profiles for this user (id = auth.users.id). Call after signIn/signUp and on session restore. */
-export async function ensureProfile(user: User): Promise<void> {
-  const { error } = await supabase.from('profiles').upsert(
-    {
-      id: user.id,
-      email: user.email ?? '',
-      full_name: (user.user_metadata?.full_name as string) ?? '',
-      hotel_name: (user.user_metadata?.hotel_name as string) ?? '',
-    },
-    { onConflict: 'id' }
-  );
+export async function ensureProfile(user: User, profile?: ProfilePayload): Promise<void> {
+  const row: Record<string, unknown> = {
+    id: user.id,
+    email: user.email ?? '',
+    full_name: (user.user_metadata?.full_name as string) ?? '',
+    hotel_name: (user.user_metadata?.hotel_name as string) ?? '',
+  };
+  if (profile) {
+    if (profile.first_name != null) row.first_name = profile.first_name;
+    if (profile.last_name != null) row.last_name = profile.last_name;
+    if (profile.hotel_role != null) row.hotel_role = profile.hotel_role;
+  }
+  const { error } = await supabase.from('profiles').upsert(row, { onConflict: 'id' });
   if (error) {
     console.warn('[auth] ensureProfile failed:', error.message);
   }
+}
+
+/** Load profile for the current user from Supabase. Returns first_name, last_name, hotel_role. */
+export async function loadProfile(userId: string): Promise<ProfilePayload | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('first_name, last_name, hotel_role')
+    .eq('id', userId)
+    .single();
+  if (error || !data) return null;
+  return {
+    first_name: data.first_name ?? undefined,
+    last_name: data.last_name ?? undefined,
+    hotel_role: data.hotel_role ?? undefined,
+  };
 }

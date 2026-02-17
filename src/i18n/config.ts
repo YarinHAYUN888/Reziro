@@ -102,6 +102,21 @@ const resources = {
       'quickAdd.roomPlaceholder': 'e.g., Ocean View Suite',
       'quickAdd.roomNumberPlaceholder': 'e.g., 101',
       'quickAdd.categoryPlaceholder': 'e.g., Expected Bookings',
+
+      // Auth (Login / Register)
+      'auth.createAccount': 'Create an account',
+      'auth.signInContinue': 'Sign in to continue',
+      'auth.firstName': 'First name',
+      'auth.lastName': 'Last name',
+      'auth.hotelRole': 'Hotel role',
+      'auth.hotelRolePlaceholder': 'e.g. Manager, Owner',
+      'auth.email': 'Email',
+      'auth.password': 'Password',
+      'auth.signUp': 'Sign up',
+      'auth.logIn': 'Log in',
+      'auth.alreadyHaveAccount': 'Already have an account? Log in',
+      'auth.needAccount': 'Need an account? Sign up',
+      'auth.fillRequired': 'Please fill in first name, last name and hotel role',
       
       // Booking Dialog
       'booking.create': 'Create Booking',
@@ -472,6 +487,21 @@ const resources = {
       'admin.monthLocked': 'החודש ננעל בהצלחה!',
       'admin.costAdded': 'פריט העלות נוסף בהצלחה!',
       'admin.costUpdated': 'פריט העלות עודכן בהצלחה!',
+
+      // Auth (Login / Register)
+      'auth.createAccount': 'יצירת חשבון',
+      'auth.signInContinue': 'התחבר כדי להמשיך',
+      'auth.firstName': 'שם פרטי',
+      'auth.lastName': 'שם משפחה',
+      'auth.hotelRole': 'תפקיד במלון',
+      'auth.hotelRolePlaceholder': 'למשל מנהל, בעלים',
+      'auth.email': 'אימייל',
+      'auth.password': 'סיסמה',
+      'auth.signUp': 'הרשמה',
+      'auth.logIn': 'התחברות',
+      'auth.alreadyHaveAccount': 'כבר יש לך חשבון? התחבר',
+      'auth.needAccount': 'צריך חשבון? הירשם',
+      'auth.fillRequired': 'נא למלא שם פרטי, שם משפחה ותפקיד במלון',
       
       // Common
       'common.today': 'היום',

@@ -48,11 +48,16 @@ const navItems = [
 export function Sidebar() {
   const { t } = useTranslation();
   const setUser = useAppStore((state) => state.setUser);
+  const setProfile = useAppStore((state) => state.setProfile);
+  const profile = useAppStore((state) => state.profile);
 
   async function handleLogout() {
     await signOut();
     setUser(null);
+    setProfile(null);
   }
+
+  const greeting = profile?.first_name ? `שלום, ${profile.first_name}` : 'שלום';
 
   return (
     <aside className="w-64 bg-card border-r border-border min-h-screen p-6 flex flex-col">
@@ -62,7 +67,7 @@ export function Sidebar() {
         alt="Reziro"
         className="h-25 object-contain"
       />
-        <p className="text-xs text-muted-foreground mt-1 font-semibold"></p>
+        <p className="text-sm text-muted-foreground mt-2 font-semibold" dir="rtl">{greeting}</p>
       </div>
 
       <nav className="space-y-2 flex-1">

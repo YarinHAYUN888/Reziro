@@ -335,6 +335,20 @@ export async function deleteManualReferralInDb(transactionId: string): Promise<v
 }
 
 /**
+ * Delete one expense in Supabase. RLS ensures only own row can be deleted (auth.uid() = user_id).
+ */
+export async function deleteExpenseInDb(expenseId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not authenticated');
+  const { error } = await supabase.from(EXPENSE_RECORDS).delete().eq('id', expenseId);
+  if (error) {
+    console.error('[supabaseSync] delete expense failed:', error.message);
+    throw error;
+  }
+}
+
+/**
  * Persist full app state to Supabase. All 8 tables; injects user_id for RLS.
  * Saves each table separately so one failure (e.g. room_financials UUID) does not block partners and others.
  */

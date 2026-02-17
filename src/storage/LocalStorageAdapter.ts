@@ -11,4 +11,6 @@ export interface StorageAdapter {
   saveManualReferralsNow?(state: AppState): Promise<void>;
   /** Optional: delete one manual referral in DB (Supabase). */
   deleteManualReferralNow?(transactionId: string): Promise<void>;
+  /** Optional: delete one expense in DB (Supabase). */
+  deleteExpenseNow?(expenseId: string): Promise<void>;
 }

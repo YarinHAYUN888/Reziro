@@ -24,10 +24,14 @@ interface BookingInput {
   createdAt?: string;
 }
 
+export type ProfileData = { first_name?: string; last_name?: string; hotel_role?: string } | null;
+
 interface StoreState extends AppState, UIState {
   [x: string]: any;
   user: User | null;
+  profile: ProfileData;
   setUser: (user: User | null) => void;
+  setProfile: (profile: ProfileData) => void;
   storage: StorageAdapter;
   setSelectedMonthKey: (key: string) => void;
   addRoom: (data: { name: string; number?: string }) => void;
@@ -122,7 +126,9 @@ function hasBookingConflict(
 
 export const useAppStore = create<StoreState>((set, get) => ({
   user: null,
+  profile: null,
   setUser: (user) => set({ user }),
+  setProfile: (profile) => set({ profile }),
   storage,
   rooms: [],
   bookings: [],
@@ -413,9 +419,8 @@ setMonthlyEmployeesExpense: (amount: number) =>
       const newState = { ...state, expenses };
 
       const storage = get().storage;
-      if (storage?.saveState) {
-        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
-      }
+      if (storage?.deleteExpenseNow) storage.deleteExpenseNow(id).catch((err) => console.error('❌ Delete expense failed:', err));
+      if (storage?.saveState) storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
 
       return newState;
     });

@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 import type { AppState } from '../types/models';
 import type { StorageAdapter } from './LocalStorageAdapter';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { loadState, saveState, savePartnersOnly, deletePartnerInDb, saveManualReferralsOnly, deleteManualReferralInDb } from './supabaseSync';
+import { loadState, saveState, savePartnersOnly, deletePartnerInDb, saveManualReferralsOnly, deleteManualReferralInDb, deleteExpenseInDb } from './supabaseSync';
 
 function getEmptyState(): AppState {
   return {
@@ -83,6 +83,15 @@ export class SupabaseAdapter implements StorageAdapter {
       const msg = typeof (err && (err as { message?: unknown }).message) === 'string' ? (err as { message: string }).message : (err instanceof Error ? err.message : 'Failed to delete referral');
       console.error('SupabaseAdapter.deleteManualReferralNow failed:', err);
       toast.error(msg || 'Failed to delete referral');
+    });
+  }
+
+  async deleteExpenseNow(expenseId: string): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    deleteExpenseInDb(expenseId).catch((err) => {
+      const msg = typeof (err && (err as { message?: unknown }).message) === 'string' ? (err as { message: string }).message : (err instanceof Error ? err.message : 'Failed to delete expense');
+      console.error('SupabaseAdapter.deleteExpenseNow failed:', err);
+      toast.error(msg || 'Failed to delete expense');
     });
   }
 }

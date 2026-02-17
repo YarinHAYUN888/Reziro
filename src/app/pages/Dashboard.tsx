@@ -25,6 +25,7 @@ interface ProfitTrendDataPoint {
 
 export function Dashboard() {
   const { t } = useTranslation();
+  const profile = useAppStore((state) => state.profile);
   const selectedMonthKey = useAppStore((state) => state.selectedMonthKey);
   const bookings = useAppStore((state) => state.bookings);
   const rooms = useAppStore((state) => state.rooms);
@@ -277,11 +278,13 @@ export function Dashboard() {
     });
   };
 
+  const greeting = profile?.first_name ? `שלום, ${profile.first_name}` : 'שלום';
+
   return (
     <div className="min-h-screen pb-16 bg-gradient-to-b from-background via-background to-background/95">
       <PageHeader
         title={t('dashboard.title')}
-        description={t('dashboard.description')}
+        description={greeting}
         action={
           <div className="flex items-center gap-3">
             <Button

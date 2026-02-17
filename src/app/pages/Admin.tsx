@@ -147,22 +147,28 @@ export function Admin() {
                         </p>
                       </div>
                     </div>
-                    <Button
-                      variant={isLocked ? 'destructive' : 'default'}
-                      onClick={handleLockToggle}
-                    >
-                      {isLocked ? (
-                        <>
-                          <Unlock className="w-4 h-4 ltr:mr-2 rtl:ml-2" />
-                          {t('admin.unlock')}
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="w-4 h-4 ltr:mr-2 rtl:ml-2" />
-                          {t('admin.lock')}
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleLockToggle}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        {isLocked ? (
+                          <>
+                            <Unlock className="w-4 h-4" />
+                            {t('admin.unlock')}
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4" />
+                            {t('admin.lock')}
+                          </>
+                        )}
+                      </button>
+                      <span className="text-[11px] text-muted-foreground text-center leading-tight max-w-[140px]">
+                        יעודכן בגרסת V2
+                      </span>
+                    </div>
                   </div>
 
                   {Object.keys(monthLocks).length > 0 && (
