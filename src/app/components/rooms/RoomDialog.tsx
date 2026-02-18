@@ -12,6 +12,7 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { GlowButton } from '../shared/GlowButton';
+import { UnsavedChangesConfirmDialog } from '../shared/UnsavedChangesConfirmDialog';
 import { useAppStore } from '../../../store/useAppStore';
 import { toast } from 'sonner';
 import { Home } from 'lucide-react';
@@ -32,6 +33,8 @@ export function RoomDialog({ open, onClose, roomId }: RoomDialogProps) {
 
   const [roomName, setRoomName] = useState(existingRoom?.name || '');
   const [roomNumber, setRoomNumber] = useState(existingRoom?.number || '');
+  const [isDirty, setIsDirty] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -42,8 +45,18 @@ export function RoomDialog({ open, onClose, roomId }: RoomDialogProps) {
         setRoomName('');
         setRoomNumber('');
       }
+      setIsDirty(false);
+      setShowConfirm(false);
     }
   }, [open, existingRoom]);
+
+  const handleClose = () => {
+    if (isDirty) {
+      setShowConfirm(true);
+    } else {
+      onClose();
+    }
+  };
 
   const handleSave = () => {
     toast.info('🔥 כפתור נלחץ!');
@@ -69,14 +82,19 @@ export function RoomDialog({ open, onClose, roomId }: RoomDialogProps) {
       toast.success('✅ חדר נוצר בהצלחה!');
     }
 
+    setIsDirty(false);
     setTimeout(() => {
       onClose();
     }, 500);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="glass-card border-primary/30 max-w-md">
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
+      <DialogContent
+        className="glass-card border-primary/30 max-w-md"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <div className="flex items-center justify-center mb-4">
             <div className="w-16 h-16 rounded-full glass-card border-primary/40 flex items-center justify-center">
@@ -98,7 +116,7 @@ export function RoomDialog({ open, onClose, roomId }: RoomDialogProps) {
             </Label>
             <Input
               value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
+              onChange={(e) => { setRoomName(e.target.value); setIsDirty(true); }}
               placeholder={t('room.namePlaceholder')}
               className="glass-card border-primary/30 text-base h-11"
               autoFocus
@@ -109,7 +127,7 @@ export function RoomDialog({ open, onClose, roomId }: RoomDialogProps) {
             <Label className="text-muted-foreground">{t('room.number')}</Label>
             <Input
               value={roomNumber}
-              onChange={(e) => setRoomNumber(e.target.value)}
+              onChange={(e) => { setRoomNumber(e.target.value); setIsDirty(true); }}
               placeholder={t('room.numberPlaceholder')}
               className="glass-card border-primary/30 text-base h-11"
             />
@@ -119,7 +137,7 @@ export function RoomDialog({ open, onClose, roomId }: RoomDialogProps) {
         <DialogFooter className="gap-2 mt-2">
           <Button
             variant="outline"
-            onClick={onClose}
+            onClick={handleClose}
             className="glass-button border-primary/30 flex-1"
           >
             {t('room.cancel')}
@@ -133,6 +151,11 @@ export function RoomDialog({ open, onClose, roomId }: RoomDialogProps) {
           </GlowButton>
         </DialogFooter>
       </DialogContent>
+      <UnsavedChangesConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        onConfirmLeave={() => { setShowConfirm(false); onClose(); }}
+      />
     </Dialog>
   );
 }

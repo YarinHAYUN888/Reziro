@@ -21,6 +21,7 @@ import { calcNightsCount, calcIncome, calcSelectedCostTotal, createSelectedCostF
 import type { SelectedCost, Booking, Partner, PartnerReferral } from '../../../types/models';
 import { ConfirmDeleteDialog } from '../shared/ConfirmDeleteDialog';
 import { BookingConflictDialog } from '../shared/BookingConflictDialog';
+import { UnsavedChangesConfirmDialog } from '../shared/UnsavedChangesConfirmDialog';
 import { Calendar } from '../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { CalendarIcon, AlertCircle, Edit2, ArrowRight, Users, Trash2, Plus } from 'lucide-react';
@@ -75,6 +76,8 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookingToDeleteId, setBookingToDeleteId] = useState<string | null>(null);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const roomCosts = costCatalog.filter((c) => c.type === 'room' && c.isActive);
   const activePartners = partners.filter((p) => p.isActive);
@@ -113,8 +116,18 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         setCurrentBookingId(undefined);
         setViewMode(initialRoomId && !bookingId ? 'list' : 'form');
       }
+      setIsDirty(false);
+      setShowConfirm(false);
     }
   }, [open, currentBookingId, initialRoomId, bookings]);
+
+  const handleClose = () => {
+    if (viewMode === 'form' && isDirty) {
+      setShowConfirm(true);
+    } else {
+      onClose();
+    }
+  };
 
   const nights = startDate && endDate ? calcNightsCount(format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd')) : 0;
   const income = calcIncome(nights, pricePerNight);
@@ -126,11 +139,12 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   const monthKey = startDate ? format(startDate, 'yyyy-MM') : '';
   const locked = monthKey ? isMonthLocked(monthKey) : false;
 
+  /** Conflict when: new.check_in < existing.check_out AND new.check_out > existing.check_in AND same room_id */
   const hasDateConflict = () => {
     if (!roomId || !startDate || !endDate) return false;
     const selectedStart = startDate.getTime();
     const selectedEnd = endDate.getTime();
-    const roomBookings = bookings.filter((b) => 
+    const roomBookings = bookings.filter((b) =>
       b.roomId === roomId && (!currentBookingId || b.id !== currentBookingId)
     );
     return roomBookings.some((booking) => {
@@ -147,6 +161,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   }, [roomId, startDate, endDate, bookings]);
 
   const handleToggleRoomCost = (catalogId: string, checked: boolean) => {
+    setIsDirty(true);
     if (checked) {
       const catalogItem = roomCosts.find((c) => c.id === catalogId);
       if (catalogItem) {
@@ -158,6 +173,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   };
 
   const handleUpdateCostQty = (catalogId: string, qty: number) => {
+    setIsDirty(true);
     const updateCost = (cost: SelectedCost) => {
       if (cost.catalogId === catalogId) {
         return {
@@ -173,6 +189,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   };
 
   const handleAddPartnerReferral = () => {
+    setIsDirty(true);
     if (!selectedPartnerId || referralGuests <= 0) {
       toast.error('נא לבחור שותף וכמות אורחים');
       return;
@@ -203,6 +220,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   };
 
   const handleRemovePartnerReferral = (index: number) => {
+    setIsDirty(true);
     setPartnerReferrals(partnerReferrals.filter((_, i) => i !== index));
     toast.success('✅ הפניה הוסרה!');
   };
@@ -291,6 +309,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         duration: 2000,
         className: 'glass-card border-primary/40 bg-primary/10',
       });
+      setIsDirty(false);
       onClose();
     } else {
       const ok = createBooking(bookingData);
@@ -302,6 +321,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         duration: 2000,
         className: 'glass-card border-primary/40 bg-primary/10',
       });
+      setIsDirty(false);
       onClose();
     }
   };
@@ -348,10 +368,17 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="glass-card border-primary/30 shadow-[0_0_40px_rgba(124,255,58,0.2)] w-[95vw] sm:w-[90vw] max-w-[1400px] h-[95vh] overflow-y-auto p-4 sm:p-6 md:p-8 mx-auto">
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
+      <DialogContent
+        className="glass-card border-primary/30 shadow-[0_0_40px_rgba(124,255,58,0.2)] w-[95vw] sm:w-[90vw] max-w-[1400px] h-[95vh] overflow-y-auto p-4 sm:p-6 md:p-8 mx-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader className="text-center mb-6">
-          <DialogTitle className="text-3xl sm:text-4xl md:text-5xl font-bold text-primary drop-shadow-[0_0_15px_rgba(124,255,58,0.6)]">
+          <DialogTitle className={cn(
+            "text-3xl sm:text-4xl md:text-5xl font-bold drop-shadow-[0_0_15px_rgba(124,255,58,0.6)]",
+            dateConflict && viewMode === 'form' ? "text-destructive" : "text-primary"
+          )}>
             {viewMode === 'list' ? 'רשימת הזמנות' : currentBookingId ? t('booking.edit') : t('booking.create')}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground text-base sm:text-lg md:text-xl mt-3">
@@ -434,7 +461,19 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
             )}
           </div>
         ) : (
-          <div className="space-y-6">
+          <div
+            className={cn(
+              "space-y-6 rounded-xl transition-all duration-200",
+              dateConflict && "border-2 border-destructive shadow-[0_0_24px_rgba(239,68,68,0.25)] p-4 sm:p-5"
+            )}
+          >
+            {dateConflict && (
+              <div className="flex justify-center">
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-destructive/15 text-destructive border border-destructive/50">
+                  התנגשות הזמנה
+                </span>
+              </div>
+            )}
             {roomId && roomBookings.length > 0 && (
               <Button
                 variant="ghost"
@@ -450,7 +489,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                 <Label className="text-foreground text-sm sm:text-base font-semibold">
                   {t('booking.room')} <span className="text-primary">*</span>
                 </Label>
-                <Select value={roomId} onValueChange={setRoomId}>
+                <Select value={roomId} onValueChange={(v) => { setIsDirty(true); setRoomId(v); }}>
                   <SelectTrigger className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg">
                     <SelectValue placeholder={t('booking.selectRoom')} />
                   </SelectTrigger>
@@ -484,7 +523,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 glass-card border-primary/30">
-                    <Calendar mode="single" selected={startDate} onSelect={setStartDate} />
+                    <Calendar mode="single" selected={startDate} onSelect={(d) => { setIsDirty(true); setStartDate(d); }} />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -509,7 +548,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 glass-card border-primary/30">
-                    <Calendar mode="single" selected={endDate} onSelect={setEndDate} />
+                    <Calendar mode="single" selected={endDate} onSelect={(d) => { setIsDirty(true); setEndDate(d); }} />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -521,7 +560,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                 <Input
                   type="number"
                   value={pricePerNight}
-                  onChange={(e) => setPricePerNight(Number(e.target.value))}
+                  onChange={(e) => { setIsDirty(true); setPricePerNight(Number(e.target.value)); }}
                   className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg"
                 />
               </div>
@@ -537,14 +576,14 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
               </div>
             )}
 
-            <div className="space-y-4">
-              <h4 className="font-bold text-foreground text-lg sm:text-xl">{t('booking.customerInfo')}</h4>
+            <div className="space-y-3">
+              <h4 className="font-bold text-foreground text-sm leading-tight">{t('booking.customerInfo')}</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 <div className="space-y-2">
                   <Label className="text-muted-foreground text-sm sm:text-base">{t('booking.name')}</Label>
                   <Input
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) => { setIsDirty(true); setCustomerName(e.target.value); }}
                     className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg"
                   />
                 </div>
@@ -553,7 +592,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                   <Input
                     type="email"
                     value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    onChange={(e) => { setIsDirty(true); setCustomerEmail(e.target.value); }}
                     className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg"
                   />
                 </div>
@@ -561,7 +600,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                   <Label className="text-muted-foreground text-sm sm:text-base">{t('booking.phone')}</Label>
                   <Input
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    onChange={(e) => { setIsDirty(true); setCustomerPhone(e.target.value); }}
                     className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg"
                   />
                 </div>
@@ -570,22 +609,22 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
 
             <Separator className="bg-primary/30" />
 
-            <div className="space-y-4">
-              <h4 className="font-bold text-foreground text-xl sm:text-2xl text-primary drop-shadow-[0_0_8px_rgba(124,255,58,0.5)]">
+            <div className="space-y-3">
+              <h4 className="font-bold text-foreground text-sm text-primary drop-shadow-[0_0_8px_rgba(124,255,58,0.5)] leading-tight">
                 {t('booking.roomCosts')}
               </h4>
               {roomCosts.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">אין עלויות חדר זמינות</p>
+                <p className="text-xs text-muted-foreground text-center py-4">אין עלויות חדר זמינות</p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                   {roomCosts.map((cost) => {
                     const selected = selectedRoomCosts.find((c) => c.catalogId === cost.id);
                     return (
                       <div
                         key={cost.id}
-                        className="glass-card border-primary/20 p-3 rounded-lg hover:border-primary/40 transition-all duration-200 hover:shadow-[0_0_15px_rgba(124,255,58,0.15)]"
+                        className="glass-card border-primary/20 p-2.5 rounded-lg hover:border-primary/40 transition-all duration-200 hover:shadow-[0_0_15px_rgba(124,255,58,0.15)] min-w-0"
                       >
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1.5">
                           <Checkbox
                             checked={!!selected}
                             onCheckedChange={(checked) =>
@@ -593,11 +632,11 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                             }
                             className="border-primary data-[state=checked]:bg-primary data-[state=checked]:shadow-[0_0_8px_rgba(124,255,58,0.5)] w-4 h-4 flex-shrink-0"
                           />
-                          <p className="text-xs text-muted-foreground font-medium">
+                          <p className="text-xs text-muted-foreground font-medium whitespace-nowrap truncate max-w-[80px]" title={`₪${cost.unitCost.toFixed(2)}`}>
                             ₪{cost.unitCost.toFixed(2)}
                           </p>
                         </div>
-                        <p className="text-sm font-semibold text-foreground leading-tight mb-3">
+                        <p className="text-xs font-semibold text-foreground leading-tight mb-2 truncate" title={cost.label}>
                           {cost.label}
                         </p>
                         {selected && (
@@ -621,23 +660,23 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
 
             <Separator className="bg-primary/30" />
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-foreground text-xl sm:text-2xl text-primary drop-shadow-[0_0_8px_rgba(124,255,58,0.5)]">
+                <h4 className="font-bold text-foreground text-sm text-primary drop-shadow-[0_0_8px_rgba(124,255,58,0.5)] leading-tight">
                   הפניות לשותפים עסקיים
                 </h4>
-                <Users className="w-6 h-6 text-primary" />
+                <Users className="w-4 h-4 text-primary flex-shrink-0" />
               </div>
 
               {activePartners.length === 0 ? (
-                <div className="glass-card border-primary/20 p-6 rounded-xl text-center">
-                  <p className="text-sm text-muted-foreground">אין שותפים עסקיים פעילים</p>
+                <div className="glass-card border-primary/20 p-4 rounded-xl text-center">
+                  <p className="text-xs text-muted-foreground">אין שותפים עסקיים פעילים</p>
                   <p className="text-xs text-muted-foreground mt-1">הוסף שותפים בעמוד "שותפים"</p>
                 </div>
               ) : (
                 <>
-                  <div className="glass-card border-primary/20 p-4 rounded-xl bg-primary/5">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="glass-card border-primary/20 p-3 rounded-xl bg-primary/5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground">בחר שותף</Label>
                         <Select value={selectedPartnerId} onValueChange={setSelectedPartnerId}>
@@ -678,19 +717,19 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                   </div>
 
                   {partnerReferrals.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-bold text-muted-foreground">הפניות שנבחרו:</p>
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-bold text-muted-foreground">הפניות שנבחרו:</p>
                       {partnerReferrals.map((referral, index) => (
                         <div
                           key={index}
-                          className="glass-card border-primary/20 p-3 rounded-lg flex items-center justify-between"
+                          className="glass-card border-primary/20 p-2.5 rounded-lg flex items-center justify-between gap-2 min-w-0"
                         >
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-foreground">{referral.partnerName}</p>
-                            <p className="text-xs text-muted-foreground">{referral.guestsCount} אורחים</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate leading-tight" title={referral.partnerName}>{referral.partnerName}</p>
+                            <p className="text-xs text-muted-foreground leading-tight">{referral.guestsCount} אורחים</p>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-base font-bold text-primary">+₪{referral.commissionEarned.toFixed(2)}</span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-sm font-bold text-primary whitespace-nowrap" dir="ltr">+₪{referral.commissionEarned.toFixed(2)}</span>
                             <button
                               onClick={() => handleRemovePartnerReferral(index)}
                               className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
@@ -708,56 +747,66 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
 
             <Separator className="bg-primary/30" />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 min-w-0">
-              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
-                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.nights')}</p>
-                <p className="text-xl sm:text-2xl font-bold text-foreground leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center">{nights}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
+              <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
+                <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.nights')}</p>
+                <p className="text-lg font-bold text-foreground leading-none tracking-tight whitespace-nowrap truncate w-full text-center" dir="ltr">{nights}</p>
               </div>
 
-              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
-                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.income')}</p>
-                <p className="text-xl sm:text-2xl font-bold text-primary leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center" dir="ltr">₪{Number(income).toFixed(2)}</p>
+              <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl min-w-fit w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
+                <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.income')}</p>
+                <p className="text-lg font-bold text-primary leading-none tracking-tight whitespace-nowrap text-center" dir="ltr">₪{Number(income).toFixed(2)}</p>
               </div>
 
-              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
-                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.roomCosts')}</p>
-                <p className="text-xl sm:text-2xl font-bold text-destructive leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center" dir="ltr">-₪{Number(totalRoomCosts).toFixed(2)}</p>
+              <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
+                <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.roomCosts')}</p>
+                <p className="text-lg font-bold text-destructive leading-none tracking-tight whitespace-nowrap truncate w-full text-center" dir="ltr">-₪{Number(totalRoomCosts).toFixed(2)}</p>
               </div>
 
-              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
-                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">הכנסות משותפים</p>
-                <p className="text-xl sm:text-2xl font-bold text-primary leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center" dir="ltr">+₪{Number(totalPartnerRevenue).toFixed(2)}</p>
+              <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
+                <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">הכנסות משותפים</p>
+                <p className="text-lg font-bold text-primary leading-none tracking-tight whitespace-nowrap truncate w-full text-center" dir="ltr">+₪{Number(totalPartnerRevenue).toFixed(2)}</p>
               </div>
 
-              <div className="glass-card border-primary/30 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1">
-                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.extraExpenses')}</p>
+              <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
+                <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.extraExpenses')}</p>
                 <Input
                   type="number"
                   value={extraExpenses}
-                  onChange={(e) => setExtraExpenses(Number(e.target.value))}
-                  className="glass-card border-primary/30 text-center w-full max-w-[120px] h-9 text-sm"
+                  onChange={(e) => { setIsDirty(true); setExtraExpenses(Number(e.target.value)); }}
+                  className="glass-card border-primary/30 text-center w-full max-w-[100px] h-8 text-xs"
                   placeholder="0"
                 />
               </div>
 
-              <div className="glass-card border-primary/50 p-4 sm:p-5 rounded-2xl overflow-hidden min-w-0 w-full min-h-[100px] flex flex-col items-center justify-center text-center gap-1 bg-gradient-to-br from-primary/10 to-transparent shadow-[0_0_25px_rgba(124,255,58,0.25)] sm:col-span-2 lg:col-span-3">
-                <p className="text-muted-foreground text-[11px] sm:text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.netProfit')}</p>
-                <p className="text-xl sm:text-2xl font-bold text-primary leading-none tracking-tight whitespace-nowrap min-w-0 w-full text-center" dir="ltr">₪{Number(netProfit).toFixed(2)}</p>
+              <div className="glass-card border-primary/50 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5 bg-gradient-to-br from-primary/10 to-transparent shadow-[0_0_25px_rgba(124,255,58,0.25)] sm:col-span-2 lg:col-span-3">
+                <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.netProfit')}</p>
+                <p className="text-lg font-bold text-primary leading-none tracking-tight whitespace-nowrap truncate w-full text-center" dir="ltr">₪{Number(netProfit).toFixed(2)}</p>
               </div>
             </div>
 
+            {dateConflict && (
+              <p className="text-sm font-bold text-destructive text-center">
+                לא ניתן לשמור – קיימת התנגשות בתאריכים
+              </p>
+            )}
             <DialogFooter className="gap-3 sm:gap-4 pt-6 border-t border-primary/20 flex-col sm:flex-row">
               <Button
                 variant="outline"
-                onClick={onClose}
+                onClick={handleClose}
                 className="glass-button border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 px-6 sm:px-8 md:px-10 w-full sm:w-auto text-base sm:text-lg"
               >
                 {t('booking.cancel')}
               </Button>
               <GlowButton
                 onClick={handleSave}
-                disabled={!roomId || !startDate || !endDate}
-                className="h-11 sm:h-12 md:h-14 px-6 sm:px-8 md:px-10 w-full sm:w-auto shadow-[0_0_20px_rgba(124,255,58,0.3)] hover:shadow-[0_0_30px_rgba(124,255,58,0.5)] transition-all text-base sm:text-lg"
+                disabled={!roomId || !startDate || !endDate || dateConflict}
+                className={cn(
+                  "h-11 sm:h-12 md:h-14 px-6 sm:px-8 md:px-10 w-full sm:w-auto transition-all text-base sm:text-lg",
+                  dateConflict
+                    ? "opacity-90 bg-destructive/20 border-2 border-destructive text-destructive cursor-not-allowed shadow-[0_0_16px_rgba(239,68,68,0.3)] hover:shadow-[0_0_16px_rgba(239,68,68,0.3)]"
+                    : "shadow-[0_0_20px_rgba(124,255,58,0.3)] hover:shadow-[0_0_30px_rgba(124,255,58,0.5)]"
+                )}
               >
                 {currentBookingId ? t('booking.update') : t('booking.createBtn')}
               </GlowButton>
@@ -776,6 +825,11 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         onConfirm={handleConfirmDeleteBooking}
       />
       <BookingConflictDialog open={conflictDialogOpen} onOpenChange={setConflictDialogOpen} />
+      <UnsavedChangesConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        onConfirmLeave={() => { setShowConfirm(false); onClose(); }}
+      />
     </Dialog>
   );
 }

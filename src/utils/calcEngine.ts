@@ -1,5 +1,5 @@
 import { format, differenceInCalendarDays, parseISO } from 'date-fns';
-import type { Booking, SelectedCost, CostCatalogItem } from '../types/models';
+import type { Booking, SelectedCost, CostCatalogItem, PartnerReferral } from '../types/models';
 
 /**
  * Calculation Engine for GEST'S Financial CRM
@@ -119,6 +119,7 @@ export interface BookingInput {
   extraExpenses: number;
   selectedRoomCosts: SelectedCost[];
   selectedHotelCosts: SelectedCost[];
+  partnerReferrals?: PartnerReferral[];
   customer?: {
     customerName?: string;
     customerPhone?: string;
@@ -139,10 +140,12 @@ export function normalizeAndComputeBooking(input: BookingInput): Booking {
   // Calculate cost totals
   const totals = calcSelectedCostsTotals(input.selectedRoomCosts, input.selectedHotelCosts);
 
-  // Calculate metrics
+  // Calculate metrics (gross = income - room costs; base net = gross - hotel costs - extra)
   const potentialProfit = calcPotentialProfit(income, totals.totalRoomCosts, totals.totalHotelCosts);
   const grossProfit = calcGrossProfit(income, totals.totalRoomCosts);
-  const netProfit = calcNetProfit(grossProfit, totals.totalHotelCosts, input.extraExpenses);
+  const baseNetProfit = calcNetProfit(grossProfit, totals.totalHotelCosts, input.extraExpenses);
+  const totalPartnerRevenue = (input.partnerReferrals ?? []).reduce((sum, r) => sum + r.commissionEarned, 0);
+  const netProfit = baseNetProfit + totalPartnerRevenue;
 
   return {
     id: input.id || crypto.randomUUID(),
@@ -157,6 +160,7 @@ export function normalizeAndComputeBooking(input: BookingInput): Booking {
     extraExpenses: input.extraExpenses,
     selectedRoomCosts: input.selectedRoomCosts,
     selectedHotelCosts: input.selectedHotelCosts,
+    partnerReferrals: input.partnerReferrals ?? undefined,
     totals,
     metrics: {
       potentialProfit,

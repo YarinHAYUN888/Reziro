@@ -11,6 +11,7 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { GlowButton } from './GlowButton';
+import { UnsavedChangesConfirmDialog } from './UnsavedChangesConfirmDialog';
 import { Loader2 } from 'lucide-react';
 
 interface AddRoomCostDialogProps {
@@ -29,14 +30,26 @@ export function AddRoomCostDialog({
   const [label, setLabel] = useState('');
   const [unitCost, setUnitCost] = useState<number>(0);
   const [defaultQty, setDefaultQty] = useState<number>(1);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     if (open) {
       setLabel('');
       setUnitCost(0);
       setDefaultQty(1);
+      setIsDirty(false);
+      setShowConfirm(false);
     }
   }, [open]);
+
+  const handleClose = () => {
+    if (isDirty) {
+      setShowConfirm(true);
+    } else {
+      onOpenChange(false);
+    }
+  };
 
   const handleSave = async () => {
     const trimmedLabel = label.trim();
@@ -49,6 +62,7 @@ export function AddRoomCostDialog({
       unitCost: Number(unitCost),
       defaultQty: Math.max(0, Math.floor(Number(defaultQty))),
     });
+    setIsDirty(false);
     onOpenChange(false);
   };
 
@@ -60,8 +74,12 @@ export function AddRoomCostDialog({
     defaultQty >= 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass-card border-primary/30 shadow-[0_0_40px_rgba(124,255,58,0.2)]">
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
+      <DialogContent
+        className="glass-card border-primary/30 shadow-[0_0_40px_rgba(124,255,58,0.2)]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-primary">
             הוסף עלות חדר
@@ -78,7 +96,7 @@ export function AddRoomCostDialog({
             </Label>
             <Input
               value={label}
-              onChange={(e) => setLabel(e.target.value)}
+              onChange={(e) => { setLabel(e.target.value); setIsDirty(true); }}
               placeholder="לדוגמה: קפה שחור"
               className="glass-card border-primary/30 h-12"
             />
@@ -93,7 +111,7 @@ export function AddRoomCostDialog({
               step="0.01"
               min="0"
               value={unitCost}
-              onChange={(e) => setUnitCost(Number(e.target.value) || 0)}
+              onChange={(e) => { setUnitCost(Number(e.target.value) || 0); setIsDirty(true); }}
               placeholder="0.00"
               className="glass-card border-primary/30 h-12"
             />
@@ -108,7 +126,7 @@ export function AddRoomCostDialog({
               min="0"
               step="1"
               value={defaultQty}
-              onChange={(e) => setDefaultQty(Number(e.target.value) || 0)}
+              onChange={(e) => { setDefaultQty(Number(e.target.value) || 0); setIsDirty(true); }}
               placeholder="1"
               className="glass-card border-primary/30 h-12"
             />
@@ -118,7 +136,7 @@ export function AddRoomCostDialog({
         <DialogFooter className="gap-3">
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={handleClose}
             disabled={isLoading}
             className="glass-button border-primary/30 h-12 px-6"
           >
@@ -140,6 +158,11 @@ export function AddRoomCostDialog({
           </GlowButton>
         </DialogFooter>
       </DialogContent>
+      <UnsavedChangesConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        onConfirmLeave={() => { setShowConfirm(false); onOpenChange(false); }}
+      />
     </Dialog>
   );
 }

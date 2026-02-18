@@ -7,6 +7,7 @@ import { GlowButton } from '../components/shared/GlowButton';
 import { ConfirmDeleteDialog } from '../components/shared/ConfirmDeleteDialog';
 import { EditRoomCostDialog } from '../components/shared/EditRoomCostDialog';
 import { AddRoomCostDialog } from '../components/shared/AddRoomCostDialog';
+import { UnsavedChangesConfirmDialog } from '../components/shared/UnsavedChangesConfirmDialog';
 import { useAppStore } from '../../store/useAppStore';
 import { Plus, Edit2, Power, Trash2, Building2, Users, Zap, Droplet, Wrench, Sparkles, MoreHorizontal } from 'lucide-react';
 import {
@@ -90,6 +91,8 @@ export function Costs() {
   const [amount, setAmount] = useState(0);
   const [category, setCategory] = useState<HotelCost['category']>('other');
   const [frequencyType, setFrequencyType] = useState<HotelCostFrequency>('monthly');
+  const [hotelCostDialogDirty, setHotelCostDialogDirty] = useState(false);
+  const [hotelCostConfirmOpen, setHotelCostConfirmOpen] = useState(false);
 
   const roomCosts = costCatalog.filter(
     (c) => c.type === 'room'
@@ -112,7 +115,17 @@ export function Costs() {
       setCategory('other');
       setFrequencyType('monthly');
     }
+    setHotelCostDialogDirty(false);
+    setHotelCostConfirmOpen(false);
     setDialogOpen(true);
+  };
+
+  const handleCloseHotelCostDialog = () => {
+    if (hotelCostDialogDirty) {
+      setHotelCostConfirmOpen(true);
+    } else {
+      setDialogOpen(false);
+    }
   };
 
   const handleSave = () => {
@@ -130,6 +143,7 @@ export function Costs() {
       toast.success('✅ עלות נוספה בהצלחה!');
     }
 
+    setHotelCostDialogDirty(false);
     setDialogOpen(false);
   };
 
@@ -377,8 +391,12 @@ export function Costs() {
       </div>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="glass-card border-primary/30 ">
+      <Dialog open={dialogOpen} onOpenChange={(nextOpen) => { if (!nextOpen) handleCloseHotelCostDialog(); }}>
+        <DialogContent
+          className="glass-card border-primary/30 "
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-primary">
               {editingCost ? 'עריכת עלות' : 'הוספת עלות חדשה'}
@@ -395,7 +413,7 @@ export function Costs() {
               </Label>
               <Input
                 value={label}
-                onChange={(e) => setLabel(e.target.value)}
+                onChange={(e) => { setLabel(e.target.value); setHotelCostDialogDirty(true); }}
                 placeholder="לדוגמה: משכורות עובדים"
                 className="glass-card border-primary/30 h-12"
               />
@@ -408,7 +426,7 @@ export function Costs() {
               <Input
                 type="number"
                 value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
+                onChange={(e) => { setAmount(Number(e.target.value)); setHotelCostDialogDirty(true); }}
                 placeholder="0"
                 className="glass-card border-primary/30 h-12"
               />
@@ -418,7 +436,7 @@ export function Costs() {
               <Label className="text-foreground font-semibold">
                 קטגוריה <span className="text-primary">*</span>
               </Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as HotelCost['category'])}>
+              <Select value={category} onValueChange={(v) => { setCategory(v as HotelCost['category']); setHotelCostDialogDirty(true); }}>
                 <SelectTrigger className="glass-card border-primary/30 h-12">
                   <SelectValue />
                 </SelectTrigger>
@@ -440,7 +458,7 @@ export function Costs() {
                     <button
                       key={freq}
                       type="button"
-                      onClick={() => setFrequencyType(freq)}
+                      onClick={() => { setFrequencyType(freq); setHotelCostDialogDirty(true); }}
                       className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                         frequencyType === freq
                           ? 'bg-primary/20 text-primary border border-primary/40 shadow-[0_0_12px_rgba(124,255,58,0.2)]'
@@ -458,7 +476,7 @@ export function Costs() {
           <DialogFooter className="gap-3">
             <Button
               variant="outline"
-              onClick={() => setDialogOpen(false)}
+              onClick={handleCloseHotelCostDialog}
               className="glass-button border-primary/30 h-12 px-6"
             >
               ביטול
@@ -469,6 +487,12 @@ export function Costs() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <UnsavedChangesConfirmDialog
+        open={hotelCostConfirmOpen}
+        onOpenChange={setHotelCostConfirmOpen}
+        onConfirmLeave={() => { setHotelCostConfirmOpen(false); setDialogOpen(false); }}
+      />
 
       <EditRoomCostDialog
         open={roomCostEditDialogOpen}

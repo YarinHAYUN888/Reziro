@@ -21,6 +21,7 @@ import { createSelectedCostFromCatalog, calcSelectedCostTotal } from '../../util
 import type { SelectedCost } from '../../types/models';
 import { Calendar } from '../components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { UnsavedChangesConfirmDialog } from '../components/shared/UnsavedChangesConfirmDialog';
 import { CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,6 +45,8 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
   
   const [selectedRoomCosts, setSelectedRoomCosts] = useState<SelectedCost[]>([]);
   const [selectedHotelCosts, setSelectedHotelCosts] = useState<SelectedCost[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const roomCosts = costCatalog.filter((c) => c.type === 'room' && c.isActive);
   const hotelCosts = costCatalog.filter((c) => c.type === 'hotel' && c.isActive);
@@ -62,10 +65,21 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
       setSelectedBookingId('');
       setSelectedRoomCosts([]);
       setSelectedHotelCosts([]);
+      setIsDirty(false);
+      setShowConfirm(false);
     }
   }, [open]);
 
+  const handleClose = () => {
+    if (isDirty) {
+      setShowConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
   const handleToggleRoomCost = (catalogId: string, checked: boolean) => {
+    setIsDirty(true);
     if (checked) {
       const catalogItem = roomCosts.find((c) => c.id === catalogId);
       if (catalogItem) {
@@ -77,6 +91,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
   };
 
   const handleToggleHotelCost = (catalogId: string, checked: boolean) => {
+    setIsDirty(true);
     if (checked) {
       const catalogItem = hotelCosts.find((c) => c.id === catalogId);
       if (catalogItem) {
@@ -88,6 +103,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
   };
 
   const handleUpdateCostQty = (catalogId: string, type: 'room' | 'hotel', qty: number) => {
+    setIsDirty(true);
     const updateCost = (cost: SelectedCost) => {
       if (cost.catalogId === catalogId) {
         return {
@@ -158,12 +174,17 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
       className: 'glass-card border-primary/40 bg-primary/10',
     });
 
+    setIsDirty(false);
     onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="glass-card border-primary/30  w-[95vw] sm:w-[90vw] max-w-6xl max-h-[95vh] overflow-y-auto p-4 sm:p-6 md:p-8">
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
+      <DialogContent
+        className="glass-card border-primary/30  w-[95vw] sm:w-[90vw] max-w-6xl max-h-[95vh] overflow-y-auto p-4 sm:p-6 md:p-8"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader className="text-center mb-6">
           <DialogTitle className="text-3xl sm:text-4xl font-bold text-primary ">
             הוסף הוצאה
@@ -173,7 +194,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={expenseType} onValueChange={(v) => setExpenseType(v as any)} className="w-full">
+        <Tabs value={expenseType} onValueChange={(v) => { setExpenseType(v as any); setIsDirty(true); }} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-8 h-12 glass-card border-2 border-primary/30 p-1">
             <TabsTrigger 
               value="hotel" 
@@ -218,7 +239,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 glass-card border-primary/30">
-                    <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} />
+                    <Calendar mode="single" selected={date} onSelect={(d) => { if (d) { setDate(d); setIsDirty(true); } }} />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -230,7 +251,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
                   </Label>
                   <Input
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(e) => { setDescription(e.target.value); setIsDirty(true); }}
                     placeholder="תיאור ההוצאה"
                     className="glass-card border-primary/30 h-12"
                   />
@@ -242,7 +263,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
                   <Label className="text-foreground font-semibold">
                     חדר <span className="text-primary">*</span>
                   </Label>
-                  <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
+                  <Select value={selectedRoomId} onValueChange={(v) => { setSelectedRoomId(v); setIsDirty(true); }}>
                     <SelectTrigger className="glass-card border-primary/30 h-12">
                       <SelectValue placeholder="בחר חדר" />
                     </SelectTrigger>
@@ -262,7 +283,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
                   <Label className="text-foreground font-semibold">
                     הזמנה <span className="text-primary">*</span>
                   </Label>
-                  <Select value={selectedBookingId} onValueChange={setSelectedBookingId}>
+                  <Select value={selectedBookingId} onValueChange={(v) => { setSelectedBookingId(v); setIsDirty(true); }}>
                     <SelectTrigger className="glass-card border-primary/30 h-12">
                       <SelectValue placeholder="בחר הזמנה" />
                     </SelectTrigger>
@@ -285,7 +306,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
                 <Input
                   type="number"
                   value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
+                  onChange={(e) => { setAmount(Number(e.target.value)); setIsDirty(true); }}
                   placeholder="0"
                   className="glass-card border-primary/30 h-12"
                 />
@@ -382,7 +403,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
         </Tabs>
 
         <DialogFooter className="gap-3 pt-6 border-t border-primary/20">
-          <Button variant="outline" onClick={onClose} className="glass-button border-primary/30 h-12 px-8">
+          <Button variant="outline" onClick={handleClose} className="glass-button border-primary/30 h-12 px-8">
             ביטול
           </Button>
           <GlowButton onClick={handleSave} className="h-12 px-8">
@@ -390,6 +411,11 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
           </GlowButton>
         </DialogFooter>
       </DialogContent>
+      <UnsavedChangesConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        onConfirmLeave={() => { setShowConfirm(false); onClose(); }}
+      />
     </Dialog>
   );
 }

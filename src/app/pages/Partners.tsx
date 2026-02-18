@@ -24,6 +24,7 @@ import { CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
 import type { Partner } from '../../types/models';
 import { format } from 'date-fns';
+import { UnsavedChangesConfirmDialog } from '../components/shared/UnsavedChangesConfirmDialog';
 
 const partnerTypeIcons = {
   restaurant: Utensils,
@@ -77,6 +78,11 @@ export default function Partners() {
   const [referralDate, setReferralDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [referralNotes, setReferralNotes] = useState('');
   const [orderAmount, setOrderAmount] = useState(0);
+
+  const [partnerDialogDirty, setPartnerDialogDirty] = useState(false);
+  const [partnerConfirmOpen, setPartnerConfirmOpen] = useState(false);
+  const [referralDialogDirty, setReferralDialogDirty] = useState(false);
+  const [referralConfirmOpen, setReferralConfirmOpen] = useState(false);
 
   // Calculate statistics with proper dependencies
   const allStats = useMemo(() => {
@@ -138,7 +144,17 @@ export default function Partners() {
       setLocation('');
       setNotes('');
     }
+    setPartnerDialogDirty(false);
+    setPartnerConfirmOpen(false);
     setDialogOpen(true);
+  };
+
+  const handleClosePartnerDialog = () => {
+    if (partnerDialogDirty) {
+      setPartnerConfirmOpen(true);
+    } else {
+      setDialogOpen(false);
+    }
   };
 
   const handleSave = () => {
@@ -180,6 +196,7 @@ export default function Partners() {
       toast.success('✅ שותף עסקי נוסף בהצלחה!');
     }
 
+    setPartnerDialogDirty(false);
     setDialogOpen(false);
   };
 
@@ -201,7 +218,17 @@ export default function Partners() {
     setReferralDate(format(new Date(), 'yyyy-MM-dd'));
     setReferralNotes('');
     setOrderAmount(0);
+    setReferralDialogDirty(false);
+    setReferralConfirmOpen(false);
     setReferralDialogOpen(true);
+  };
+
+  const handleCloseReferralDialog = () => {
+    if (referralDialogDirty) {
+      setReferralConfirmOpen(true);
+    } else {
+      setReferralDialogOpen(false);
+    }
   };
 
   const handleSaveReferral = () => {
@@ -229,6 +256,7 @@ export default function Partners() {
   
 
     toast.success('✅ הפניה נרשמה בהצלחה!');
+    setReferralDialogDirty(false);
     setReferralDialogOpen(false);
   };
 
@@ -277,15 +305,14 @@ export default function Partners() {
           <div className="flex gap-3">
             <GlowButton
               onClick={handleOpenReferralDialog}
-              variant="outline"
-              className=""
+              className="h-12 px-6 shadow-[0_0_20px_rgba(124,255,58,0.3)] hover:shadow-[0_0_30px_rgba(124,255,58,0.5)] cursor-pointer font-bold"
             >
               <Plus className="w-5 h-5 mr-2" />
               רשום הפניה
             </GlowButton>
             <GlowButton
               onClick={() => handleOpenDialog()}
-              className=""
+              className="h-12 px-6 shadow-[0_0_20px_rgba(124,255,58,0.3)] hover:shadow-[0_0_30px_rgba(124,255,58,0.5)] cursor-pointer font-bold"
             >
               <Plus className="w-5 h-5 mr-2" />
               הוסף שותף
@@ -459,8 +486,12 @@ export default function Partners() {
       </GlassCard>
 
       {/* Add/Edit Partner Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="glass-card border-primary/30  max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={dialogOpen} onOpenChange={(nextOpen) => { if (!nextOpen) handleClosePartnerDialog(); }}>
+        <DialogContent
+          className="glass-card border-primary/30  max-w-3xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-primary">
               {editingPartner ? 'עריכת שותף עסקי' : 'הוספת שותף עסקי חדש'}
@@ -478,7 +509,7 @@ export default function Partners() {
                 </Label>
                 <Input
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => { setName(e.target.value); setPartnerDialogDirty(true); }}
                   placeholder="מסעדת טאבון"
                   className="glass-card border-primary/30 h-12"
                 />
@@ -488,7 +519,7 @@ export default function Partners() {
                 <Label className="text-foreground font-semibold">
                   סוג עסק <span className="text-primary">*</span>
                 </Label>
-                <Select value={type} onValueChange={(v) => setType(v as Partner['type'])}>
+                <Select value={type} onValueChange={(v) => { setType(v as Partner['type']); setPartnerDialogDirty(true); }}>
                   <SelectTrigger className="glass-card border-primary/30 h-12">
                     <SelectValue />
                   </SelectTrigger>
@@ -510,7 +541,7 @@ export default function Partners() {
                 </Label>
                 <Input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => { setPhone(e.target.value); setPartnerDialogDirty(true); }}
                   placeholder="054-XXXXXXX"
                   className="glass-card border-primary/30 h-12"
                 />
@@ -523,7 +554,7 @@ export default function Partners() {
                 <Input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setPartnerDialogDirty(true); }}
                   placeholder="business@email.com"
                   className="glass-card border-primary/30 h-12"
                 />
@@ -535,7 +566,7 @@ export default function Partners() {
                 עמלה שהמלון מרוויח <span className="text-primary">*</span>
               </Label>
               
-              <RadioGroup value={commissionType} onValueChange={(v) => setCommissionType(v as 'percentage' | 'fixed')}>
+              <RadioGroup value={commissionType} onValueChange={(v) => { setCommissionType(v as 'percentage' | 'fixed'); setPartnerDialogDirty(true); }}>
                 <div className="flex items-center space-x-2 space-x-reverse">
                   <RadioGroupItem value="fixed" id="fixed" />
                   <Label htmlFor="fixed" className="cursor-pointer">סכום קבוע (₪) להפניה</Label>
@@ -553,7 +584,7 @@ export default function Partners() {
                 <Input
                   type="number"
                   value={commissionValue}
-                  onChange={(e) => setCommissionValue(Number(e.target.value))}
+                  onChange={(e) => { setCommissionValue(Number(e.target.value)); setPartnerDialogDirty(true); }}
                   placeholder={commissionType === 'fixed' ? '50' : '15'}
                   className="glass-card border-primary/30 h-12"
                   min={0}
@@ -574,7 +605,7 @@ export default function Partners() {
               <Input
                 type="number"
                 value={discountForGuests}
-                onChange={(e) => setDiscountForGuests(Number(e.target.value))}
+                onChange={(e) => { setDiscountForGuests(Number(e.target.value)); setPartnerDialogDirty(true); }}
                 placeholder="10"
                 className="glass-card border-primary/30 h-12"
                 min={0}
@@ -590,10 +621,10 @@ export default function Partners() {
 
             <div className="space-y-2">
               <Label className="text-foreground font-semibold">מיקום (אופציונלי)</Label>
-              <Input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="רחוב בן יהודה 15, ירושלים"
+            <Input
+              value={location}
+              onChange={(e) => { setLocation(e.target.value); setPartnerDialogDirty(true); }}
+              placeholder="רחוב בן יהודה 15, ירושלים"
                 className="glass-card border-primary/30 h-12"
               />
             </div>
@@ -602,7 +633,7 @@ export default function Partners() {
               <Label className="text-foreground font-semibold">הערות (אופציונלי)</Label>
               <Textarea
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => { setNotes(e.target.value); setPartnerDialogDirty(true); }}
                 placeholder="הערות נוספות על השותף..."
                 className="glass-card border-primary/30 min-h-[80px]"
               />
@@ -612,7 +643,7 @@ export default function Partners() {
           <DialogFooter className="gap-3">
             <Button
               variant="outline"
-              onClick={() => setDialogOpen(false)}
+              onClick={handleClosePartnerDialog}
               className="glass-button border-primary/30 h-12 px-6"
             >
               ביטול
@@ -624,9 +655,19 @@ export default function Partners() {
         </DialogContent>
       </Dialog>
 
+      <UnsavedChangesConfirmDialog
+        open={partnerConfirmOpen}
+        onOpenChange={setPartnerConfirmOpen}
+        onConfirmLeave={() => { setPartnerConfirmOpen(false); setDialogOpen(false); }}
+      />
+
       {/* Manual Referral Dialog */}
-      <Dialog open={referralDialogOpen} onOpenChange={setReferralDialogOpen}>
-        <DialogContent className="glass-card border-primary/30  max-w-xl">
+      <Dialog open={referralDialogOpen} onOpenChange={(nextOpen) => { if (!nextOpen) handleCloseReferralDialog(); }}>
+        <DialogContent
+          className="glass-card border-primary/30  max-w-xl"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-primary">
               רישום הפניה ידנית
@@ -641,7 +682,7 @@ export default function Partners() {
               <Label className="text-foreground font-semibold">
                 בחר שותף <span className="text-primary">*</span>
               </Label>
-              <Select value={referralPartnerId} onValueChange={setReferralPartnerId}>
+              <Select value={referralPartnerId} onValueChange={(v) => { setReferralPartnerId(v); setReferralDialogDirty(true); }}>
                 <SelectTrigger className="glass-card border-primary/30 h-12">
                   <SelectValue placeholder="בחר שותף עסקי" />
                 </SelectTrigger>
@@ -663,7 +704,7 @@ export default function Partners() {
                 <Input
                   type="number"
                   value={referralGuests}
-                  onChange={(e) => setReferralGuests(Number(e.target.value))}
+                  onChange={(e) => { setReferralGuests(Number(e.target.value)); setReferralDialogDirty(true); }}
                   min={1}
                   className="glass-card border-primary/30 h-12"
                 />
@@ -676,7 +717,7 @@ export default function Partners() {
                 <Input
                   type="date"
                   value={referralDate}
-                  onChange={(e) => setReferralDate(e.target.value)}
+                  onChange={(e) => { setReferralDate(e.target.value); setReferralDialogDirty(true); }}
                   className="glass-card border-primary/30 h-12"
                 />
               </div>
@@ -690,7 +731,7 @@ export default function Partners() {
                 <Input
                   type="number"
                   value={orderAmount}
-                  onChange={(e) => setOrderAmount(Number(e.target.value))}
+                  onChange={(e) => { setOrderAmount(Number(e.target.value)); setReferralDialogDirty(true); }}
                   min={0}
                   placeholder="100"
                   className="glass-card border-primary/30 h-12"
@@ -705,7 +746,7 @@ export default function Partners() {
               <Label className="text-foreground font-semibold">הערות (אופציונלי)</Label>
               <Textarea
                 value={referralNotes}
-                onChange={(e) => setReferralNotes(e.target.value)}
+                onChange={(e) => { setReferralNotes(e.target.value); setReferralDialogDirty(true); }}
                 placeholder="הערות על ההפניה..."
                 className="glass-card border-primary/30 min-h-[60px]"
               />
@@ -730,7 +771,7 @@ export default function Partners() {
           <DialogFooter className="gap-3">
             <Button
               variant="outline"
-              onClick={() => setReferralDialogOpen(false)}
+              onClick={handleCloseReferralDialog}
               className="glass-button border-primary/30 h-12 px-6"
             >
               ביטול
@@ -741,6 +782,12 @@ export default function Partners() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <UnsavedChangesConfirmDialog
+        open={referralConfirmOpen}
+        onOpenChange={setReferralConfirmOpen}
+        onConfirmLeave={() => { setReferralConfirmOpen(false); setReferralDialogOpen(false); }}
+      />
     </div>
   );
 }
