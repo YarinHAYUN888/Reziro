@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import {
@@ -76,8 +76,68 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookingToDeleteId, setBookingToDeleteId] = useState<string | null>(null);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [vatEnabled, setVatEnabled] = useState(false);
+  const [snapshotVersion, setSnapshotVersion] = useState(0);
+
+  /** Snapshot of logical booking fields only (no derived/temporary/UI state). */
+  const getBookingSnapshot = (opts: {
+    start: Date | undefined;
+    end: Date | undefined;
+    price: number;
+    extra: number;
+    vat: boolean;
+    roomCosts: SelectedCost[];
+    referrals: PartnerReferral[];
+    cust: { customerName: string; customerEmail: string; customerPhone: string } | undefined;
+  }) => ({
+    check_in: opts.start ? format(opts.start, 'yyyy-MM-dd') : '',
+    check_out: opts.end ? format(opts.end, 'yyyy-MM-dd') : '',
+    base_amount: opts.start && opts.end ? calcIncome(calcNightsCount(format(opts.start, 'yyyy-MM-dd'), format(opts.end, 'yyyy-MM-dd')), opts.price) : 0,
+    vat_enabled: opts.vat,
+    total_amount: opts.start && opts.end
+      ? (opts.vat ? calcIncome(calcNightsCount(format(opts.start, 'yyyy-MM-dd'), format(opts.end, 'yyyy-MM-dd')), opts.price) * 1.18 : calcIncome(calcNightsCount(format(opts.start, 'yyyy-MM-dd'), format(opts.end, 'yyyy-MM-dd')), opts.price))
+      : 0,
+    extra_expenses: opts.extra,
+    partner_referrals: opts.referrals
+      .map((r) => ({ partnerId: r.partnerId, guestsCount: r.guestsCount, date: r.date }))
+      .sort((a, b) => `${a.partnerId}-${a.date}`.localeCompare(`${b.partnerId}-${b.date}`)),
+    room_costs: opts.roomCosts.map((c) => ({ id: c.catalogId, qty: c.qty })).sort((a, b) => a.id.localeCompare(b.id)),
+    customer: opts.cust ? { customerName: opts.cust.customerName, customerEmail: opts.cust.customerEmail, customerPhone: opts.cust.customerPhone } : undefined,
+  });
+
+  const initialSnapshotRef = useRef<string>('');
+
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify(
+        getBookingSnapshot({
+          start: startDate,
+          end: endDate,
+          price: pricePerNight,
+          extra: extraExpenses,
+          vat: vatEnabled,
+          roomCosts: selectedRoomCosts,
+          referrals: partnerReferrals,
+          cust: customerName || customerEmail || customerPhone ? { customerName, customerEmail, customerPhone } : undefined,
+        })
+      ),
+    [
+      snapshotVersion,
+      startDate,
+      endDate,
+      pricePerNight,
+      extraExpenses,
+      vatEnabled,
+      selectedRoomCosts,
+      partnerReferrals,
+      customerName,
+      customerEmail,
+      customerPhone,
+    ]
+  );
+
+  const isDirty = viewMode === 'form' && currentSnapshot !== initialSnapshotRef.current;
 
   const roomCosts = costCatalog.filter((c) => c.type === 'room' && c.isActive);
   const activePartners = partners.filter((p) => p.isActive);
@@ -99,7 +159,18 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         setCustomerPhone(booking.customer?.customerPhone || '');
         setSelectedRoomCosts(booking.selectedRoomCosts || []);
         setPartnerReferrals(booking.partnerReferrals || []);
+        setVatEnabled(booking.vatEnabled ?? false);
         setViewMode('form');
+        initialSnapshotRef.current = JSON.stringify(getBookingSnapshot({
+          start: new Date(booking.startDate),
+          end: new Date(booking.endDate),
+          price: booking.pricePerNight,
+          extra: booking.extraExpenses,
+          vat: booking.vatEnabled ?? false,
+          roomCosts: booking.selectedRoomCosts || [],
+          referrals: booking.partnerReferrals || [],
+          cust: booking.customer ? { customerName: booking.customer.customerName || '', customerEmail: booking.customer.customerEmail || '', customerPhone: booking.customer.customerPhone || '' } : undefined,
+        }));
       } else {
         setRoomId(initialRoomId || '');
         setStartDate(undefined);
@@ -113,10 +184,21 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         setPartnerReferrals([]);
         setSelectedPartnerId('');
         setReferralGuests(1);
+        setVatEnabled(false);
         setCurrentBookingId(undefined);
         setViewMode(initialRoomId && !bookingId ? 'list' : 'form');
+        initialSnapshotRef.current = JSON.stringify(getBookingSnapshot({
+          start: undefined,
+          end: undefined,
+          price: 100,
+          extra: 0,
+          vat: false,
+          roomCosts: [],
+          referrals: [],
+          cust: undefined,
+        }));
       }
-      setIsDirty(false);
+      setSnapshotVersion((v) => v + 1);
       setShowConfirm(false);
     }
   }, [open, currentBookingId, initialRoomId, bookings]);
@@ -161,7 +243,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   }, [roomId, startDate, endDate, bookings]);
 
   const handleToggleRoomCost = (catalogId: string, checked: boolean) => {
-    setIsDirty(true);
     if (checked) {
       const catalogItem = roomCosts.find((c) => c.id === catalogId);
       if (catalogItem) {
@@ -173,7 +254,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   };
 
   const handleUpdateCostQty = (catalogId: string, qty: number) => {
-    setIsDirty(true);
     const updateCost = (cost: SelectedCost) => {
       if (cost.catalogId === catalogId) {
         return {
@@ -189,7 +269,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   };
 
   const handleAddPartnerReferral = () => {
-    setIsDirty(true);
     if (!selectedPartnerId || referralGuests <= 0) {
       toast.error('נא לבחור שותף וכמות אורחים');
       return;
@@ -220,7 +299,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   };
 
   const handleRemovePartnerReferral = (index: number) => {
-    setIsDirty(true);
     setPartnerReferrals(partnerReferrals.filter((_, i) => i !== index));
     toast.success('✅ הפניה הוסרה!');
   };
@@ -262,7 +340,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
     setReferralGuests(1);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!roomId || !startDate || !endDate) {
       toast.error(t('booking.fillRequired') || 'אנא מלא את כל השדות הנדרשים');
       return;
@@ -290,6 +368,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
       selectedRoomCosts,
       selectedHotelCosts: [],
       partnerReferrals,
+      vatEnabled,
       customer: customerName || customerEmail || customerPhone
         ? { customerName, customerEmail, customerPhone }
         : undefined,
@@ -297,31 +376,37 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
 
     if (currentBookingId) {
       const existingBooking = bookings.find((b) => b.id === currentBookingId);
-      const ok = updateBooking(currentBookingId, {
+      const ok = await updateBooking(currentBookingId, {
         ...bookingData,
         createdAt: existingBooking?.createdAt,
       });
       if (!ok) {
         setConflictDialogOpen(true);
+        initialSnapshotRef.current = currentSnapshot;
+        setSnapshotVersion((v) => v + 1);
         return;
       }
+      initialSnapshotRef.current = currentSnapshot;
+      setSnapshotVersion((v) => v + 1);
       toast.success('✅ עודכן בהצלחה!', {
         duration: 2000,
         className: 'glass-card border-primary/40 bg-primary/10',
       });
-      setIsDirty(false);
       onClose();
     } else {
       const ok = createBooking(bookingData);
       if (!ok) {
         setConflictDialogOpen(true);
+        initialSnapshotRef.current = currentSnapshot;
+        setSnapshotVersion((v) => v + 1);
         return;
       }
+      initialSnapshotRef.current = currentSnapshot;
+      setSnapshotVersion((v) => v + 1);
       toast.success('✅ הזמנה נוצרה בהצלחה!', {
         duration: 2000,
         className: 'glass-card border-primary/40 bg-primary/10',
       });
-      setIsDirty(false);
       onClose();
     }
   };
@@ -451,7 +536,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                       </div>
 
                       <div className="text-left space-y-1">
-                        <p className="text-2xl font-bold text-primary">₪{booking.income.toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-primary">₪{(booking.totalAmount ?? booking.income).toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">רווח נקי: ₪{booking.metrics.netProfit.toFixed(2)}</p>
                       </div>
                     </div>
@@ -489,7 +574,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                 <Label className="text-foreground text-sm sm:text-base font-semibold">
                   {t('booking.room')} <span className="text-primary">*</span>
                 </Label>
-                <Select value={roomId} onValueChange={(v) => { setIsDirty(true); setRoomId(v); }}>
+                <Select value={roomId} onValueChange={setRoomId}>
                   <SelectTrigger className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg">
                     <SelectValue placeholder={t('booking.selectRoom')} />
                   </SelectTrigger>
@@ -523,7 +608,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 glass-card border-primary/30">
-                    <Calendar mode="single" selected={startDate} onSelect={(d) => { setIsDirty(true); setStartDate(d); }} />
+                    <Calendar mode="single" selected={startDate} onSelect={setStartDate} />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -548,7 +633,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 glass-card border-primary/30">
-                    <Calendar mode="single" selected={endDate} onSelect={(d) => { setIsDirty(true); setEndDate(d); }} />
+                    <Calendar mode="single" selected={endDate} onSelect={setEndDate} />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -560,7 +645,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                 <Input
                   type="number"
                   value={pricePerNight}
-                  onChange={(e) => { setIsDirty(true); setPricePerNight(Number(e.target.value)); }}
+                  onChange={(e) => setPricePerNight(Number(e.target.value))}
                   className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg"
                 />
               </div>
@@ -583,7 +668,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                   <Label className="text-muted-foreground text-sm sm:text-base">{t('booking.name')}</Label>
                   <Input
                     value={customerName}
-                    onChange={(e) => { setIsDirty(true); setCustomerName(e.target.value); }}
+                    onChange={(e) => setCustomerName(e.target.value)}
                     className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg"
                   />
                 </div>
@@ -592,7 +677,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                   <Input
                     type="email"
                     value={customerEmail}
-                    onChange={(e) => { setIsDirty(true); setCustomerEmail(e.target.value); }}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
                     className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg"
                   />
                 </div>
@@ -600,7 +685,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                   <Label className="text-muted-foreground text-sm sm:text-base">{t('booking.phone')}</Label>
                   <Input
                     value={customerPhone}
-                    onChange={(e) => { setIsDirty(true); setCustomerPhone(e.target.value); }}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
                     className="glass-card border-primary/30 hover:border-primary/50 transition-all h-11 sm:h-12 md:h-14 text-base sm:text-lg"
                   />
                 </div>
@@ -773,7 +858,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                 <Input
                   type="number"
                   value={extraExpenses}
-                  onChange={(e) => { setIsDirty(true); setExtraExpenses(Number(e.target.value)); }}
+                  onChange={(e) => setExtraExpenses(Number(e.target.value))}
                   className="glass-card border-primary/30 text-center w-full max-w-[100px] h-8 text-xs"
                   placeholder="0"
                 />
@@ -783,6 +868,53 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
                 <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.netProfit')}</p>
                 <p className="text-lg font-bold text-primary leading-none tracking-tight whitespace-nowrap truncate w-full text-center" dir="ltr">₪{Number(netProfit).toFixed(2)}</p>
               </div>
+            </div>
+
+            {/* VAT Toggle */}
+            <div className="space-y-3 pt-4 border-t border-primary/20">
+              <p className="text-xs font-semibold text-muted-foreground">מע&quot;מ</p>
+              <div className="flex rounded-xl overflow-hidden border border-primary/30 bg-background/50 p-1 gap-0">
+                <button
+                  type="button"
+                  onClick={() => setVatEnabled(false)}
+                  className={cn(
+                    'flex-1 py-2.5 px-4 text-sm font-bold transition-all duration-200 cursor-pointer',
+                    !vatEnabled
+                      ? 'bg-primary text-primary-foreground shadow-[0_0_12px_rgba(124,255,58,0.25)]'
+                      : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                  )}
+                >
+                  ללא מע&quot;מ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVatEnabled(true)}
+                  className={cn(
+                    'flex-1 py-2.5 px-4 text-sm font-bold transition-all duration-200 cursor-pointer',
+                    vatEnabled
+                      ? 'bg-primary text-primary-foreground shadow-[0_0_12px_rgba(124,255,58,0.25)]'
+                      : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                  )}
+                >
+                  כולל מע&quot;מ (18%)
+                </button>
+              </div>
+              {vatEnabled && (
+                <div className="glass-card border-primary/30 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">מחיר בסיס:</span>
+                    <span className="font-semibold" dir="ltr">₪{Number(income).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">מע&quot;מ (18%):</span>
+                    <span className="font-semibold" dir="ltr">₪{(Math.round(income * 0.18 * 100) / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-base font-bold text-primary pt-1 border-t border-primary/20">
+                    <span>סה&quot;כ כולל מע&quot;מ:</span>
+                    <span dir="ltr">₪{(Math.round(income * 1.18 * 100) / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {dateConflict && (

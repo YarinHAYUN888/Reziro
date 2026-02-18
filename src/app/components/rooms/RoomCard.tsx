@@ -24,7 +24,7 @@ export function RoomCard({ room, bookings, monthKey, onBookingClick }: RoomCardP
 
   const monthBookings = bookings.filter((b) => b.roomId === room.id && b.monthKey === monthKey);
   const totalNights = monthBookings.reduce((sum, b) => sum + b.nightsCount, 0);
-  const totalIncome = monthBookings.reduce((sum, b) => sum + b.income, 0);
+  const totalIncome = monthBookings.reduce((sum, b) => sum + (b.totalAmount ?? b.income), 0);
   const totalNetProfit = monthBookings.reduce((sum, b) => sum + b.metrics.netProfit, 0);
 
   const nextBooking = monthBookings.length > 0 ? monthBookings[0] : null;
@@ -82,12 +82,20 @@ export function RoomCard({ room, bookings, monthKey, onBookingClick }: RoomCardP
                 <p className="text-sm font-semibold">{totalNights} {t('common.nights')}</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-muted-foreground" />
               <div>
+                <p className="text-xs text-muted-foreground">{t('dashboard.totalIncome')}</p>
+                <p className="text-sm font-semibold text-primary" dir="ltr">
+                  ₪{totalIncome.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 sm:col-span-2">
+              <DollarSign className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div>
                 <p className="text-xs text-muted-foreground">{t('dashboard.netProfit')}</p>
-                <p className="text-sm font-semibold text-primary ">
+                <p className="text-sm font-semibold text-primary" dir="ltr">
                   ₪{totalNetProfit.toFixed(2)}
                 </p>
               </div>

@@ -33,7 +33,10 @@ export interface Booking {
   weekOfMonth: 1 | 2 | 3 | 4; // derived from startDate
   pricePerNight: number;
   nightsCount: number; // derived from date range
-  income: number; // default = nightsCount * pricePerNight
+  income: number; // default = nightsCount * pricePerNight (base amount)
+  vatEnabled?: boolean; // VAT 18% toggle
+  vatAmount?: number; // VAT amount when vatEnabled
+  totalAmount?: number; // income + vatAmount when vatEnabled, else same as income
   extraExpenses: number; // manual extra expenses
   selectedRoomCosts: SelectedCost[];
   selectedHotelCosts: SelectedCost[];

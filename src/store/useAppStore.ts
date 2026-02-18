@@ -15,7 +15,8 @@ interface BookingInput {
   extraExpenses: number;
   selectedRoomCosts: SelectedCost[];
   selectedHotelCosts: SelectedCost[];
-  partnerReferrals?: PartnerReferral[]; // 🆕 NEW
+  partnerReferrals?: PartnerReferral[];
+  vatEnabled?: boolean;
   customer?: {
     customerName?: string;
     customerPhone?: string;
@@ -38,7 +39,7 @@ interface StoreState extends AppState, UIState {
   updateRoom: (id: string, data: { name: string; number?: string }) => void;
   deleteRoom: (id: string) => void;
   createBooking: (input: BookingInput) => boolean;
-  updateBooking: (id: string, input: Partial<BookingInput>) => boolean;
+  updateBooking: (id: string, input: Partial<BookingInput>) => Promise<boolean>;
   deleteBooking: (id: string) => void;
   monthlyBanksExpense: number;
 monthlyEmployeesExpense: number;
@@ -220,7 +221,7 @@ monthlyEmployeesExpense: 0,
     return true;
   },
 
-  updateBooking: (id, input) => {
+  updateBooking: async (id, input) => {
     const existing = get().bookings.find((b) => b.id === id);
     if (!existing) return false;
 
@@ -233,6 +234,7 @@ monthlyEmployeesExpense: 0,
       selectedRoomCosts: input.selectedRoomCosts ?? existing.selectedRoomCosts,
       selectedHotelCosts: input.selectedHotelCosts ?? existing.selectedHotelCosts,
       partnerReferrals: input.partnerReferrals ?? existing.partnerReferrals,
+      vatEnabled: input.vatEnabled ?? existing.vatEnabled,
       customer: input.customer ?? existing.customer,
       createdAt: input.createdAt ?? existing.createdAt,
     };
@@ -246,13 +248,28 @@ monthlyEmployeesExpense: 0,
 
     set((state) => {
       const bookings = state.bookings.map((b) => (b.id === id ? finalBooking : b));
-      const newState = { ...state, bookings };
-      const storage = get().storage;
-      if (storage?.saveState) {
-        storage.saveState(newState).catch((err) => console.error('❌ Save failed:', err));
-      }
-      return newState;
+      return { ...state, bookings };
     });
+
+    const storage = get().storage;
+    if (storage?.updateBookingNow) {
+      const updated = await storage.updateBookingNow(finalBooking);
+      if (updated) {
+        set((state) => ({
+          ...state,
+          bookings: state.bookings.map((b) => (b.id === id ? updated : b)),
+        }));
+        return true;
+      }
+      set((state) => ({
+        ...state,
+        bookings: state.bookings.map((b) => (b.id === id ? existing : b)),
+      }));
+      return false;
+    }
+    if (storage?.saveState) {
+      storage.saveState(get()).catch((err) => console.error('❌ Save failed:', err));
+    }
     return true;
   },
 

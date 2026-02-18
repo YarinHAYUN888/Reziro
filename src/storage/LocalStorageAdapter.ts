@@ -1,8 +1,10 @@
-import type { AppState } from '../types/models';
+import type { AppState, Booking } from '../types/models';
 
 export interface StorageAdapter {
   loadState(): Promise<AppState>;
   saveState(state: AppState): Promise<void>;
+  /** Optional: update one booking in DB and return updated row for local state sync (Supabase). */
+  updateBookingNow?(booking: Booking): Promise<Booking | null>;
   /** Optional: immediate save of partners only (Supabase). No-op if not implemented. */
   savePartnersNow?(state: AppState): Promise<void>;
   /** Optional: delete one partner in DB (Supabase). No-op if not implemented. */

@@ -4,7 +4,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import type { AppState, CostCatalogItem } from '../types/models';
+import type { AppState, CostCatalogItem, Booking } from '../types/models';
 import {
   roomFromRow,
   bookingFromRow,
@@ -57,6 +57,7 @@ const ALLOWED_COLUMNS: Record<TableName, readonly string[]> = {
   [INCOME_RECORDS]: [
     'id', 'user_id', 'room_id', 'start_date', 'end_date', 'month_key', 'week_of_month',
     'price_per_night', 'nights_count', 'income', 'amount', 'extra_expenses',
+    'vat_enabled', 'vat_amount', 'total_amount',
     'selected_room_costs', 'selected_hotel_costs', 'partner_referrals',
     'totals', 'metrics', 'customer', 'created_at', 'updated_at',
   ],
@@ -404,6 +405,32 @@ export async function deleteExpenseInDb(expenseId: string): Promise<void> {
     console.error('[supabaseSync] delete expense failed:', error.message);
     throw error;
   }
+}
+
+/**
+ * Update a single income_record (booking) in Supabase and return the updated row.
+ * Uses .select().single() so the updated row is returned for immediate local state sync.
+ */
+export async function updateIncomeRecordInDb(booking: Booking, userId: string): Promise<Record<string, unknown>> {
+  if (!isSupabaseConfigured()) throw new Error('Supabase not configured');
+  const row = {
+    ...toSnake(bookingToRow(booking) as Record<string, unknown>),
+    user_id: userId,
+    amount: booking.income ?? 0,
+  };
+  const payload = sanitizeRow(INCOME_RECORDS, row as Record<string, unknown>);
+  const { data, error } = await supabase
+    .from(INCOME_RECORDS)
+    .update(payload)
+    .eq('id', booking.id)
+    .eq('user_id', userId)
+    .select()
+    .single();
+  if (error) {
+    console.error('[supabaseSync] update income_record failed:', error.message);
+    throw error;
+  }
+  return (data ?? {}) as Record<string, unknown>;
 }
 
 /**

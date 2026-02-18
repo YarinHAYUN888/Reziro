@@ -120,6 +120,7 @@ export interface BookingInput {
   selectedRoomCosts: SelectedCost[];
   selectedHotelCosts: SelectedCost[];
   partnerReferrals?: PartnerReferral[];
+  vatEnabled?: boolean;
   customer?: {
     customerName?: string;
     customerPhone?: string;
@@ -147,6 +148,11 @@ export function normalizeAndComputeBooking(input: BookingInput): Booking {
   const totalPartnerRevenue = (input.partnerReferrals ?? []).reduce((sum, r) => sum + r.commissionEarned, 0);
   const netProfit = baseNetProfit + totalPartnerRevenue;
 
+  const VAT_RATE = 0.18;
+  const vatEnabled = input.vatEnabled === true;
+  const vatAmount = vatEnabled ? Math.round(income * VAT_RATE * 100) / 100 : 0;
+  const totalAmount = vatEnabled ? Math.round(income * (1 + VAT_RATE) * 100) / 100 : income;
+
   return {
     id: input.id || crypto.randomUUID(),
     roomId: input.roomId,
@@ -157,6 +163,9 @@ export function normalizeAndComputeBooking(input: BookingInput): Booking {
     pricePerNight: input.pricePerNight,
     nightsCount,
     income,
+    vatEnabled: vatEnabled || undefined,
+    vatAmount: vatEnabled ? vatAmount : undefined,
+    totalAmount: vatEnabled ? totalAmount : income,
     extraExpenses: input.extraExpenses,
     selectedRoomCosts: input.selectedRoomCosts,
     selectedHotelCosts: input.selectedHotelCosts,

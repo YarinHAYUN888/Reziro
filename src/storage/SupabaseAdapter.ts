@@ -1,8 +1,9 @@
 import { toast } from 'sonner';
-import type { AppState } from '../types/models';
+import type { AppState, Booking } from '../types/models';
 import type { StorageAdapter } from './LocalStorageAdapter';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { loadState, saveState, savePartnersOnly, deletePartnerInDb, saveManualReferralsOnly, deleteManualReferralInDb, deleteExpenseInDb, insertRoomCostInDb } from './supabaseSync';
+import { loadState, saveState, savePartnersOnly, deletePartnerInDb, saveManualReferralsOnly, deleteManualReferralInDb, deleteExpenseInDb, insertRoomCostInDb, updateIncomeRecordInDb } from './supabaseSync';
+import { bookingFromRow } from './supabaseMappings';
 import type { CostCatalogItem } from '../types/models';
 
 function getEmptyState(): AppState {
@@ -29,6 +30,20 @@ export class SupabaseAdapter implements StorageAdapter {
       return getEmptyState();
     }
     return loadState();
+  }
+
+  async updateBookingNow(booking: Booking): Promise<Booking | null> {
+    if (!isSupabaseConfigured()) return null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return null;
+      const row = await updateIncomeRecordInDb(booking, session.user.id);
+      return bookingFromRow(row);
+    } catch (err) {
+      console.error('SupabaseAdapter.updateBookingNow failed:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update booking');
+      return null;
+    }
   }
 
   async saveState(state: AppState): Promise<void> {

@@ -44,7 +44,7 @@ export function Financial() {
   }, [hotelCosts, selectedMonthKey]);
 
   const totalIncome = useMemo(() => {
-    return monthBookings.reduce((sum, b) => sum + b.income, 0);
+    return monthBookings.reduce((sum, b) => sum + (b.totalAmount ?? b.income), 0);
   }, [monthBookings]);
 
   const totalRoomExpenses = useMemo(() => {

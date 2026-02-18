@@ -60,7 +60,7 @@ export function Dashboard() {
     .filter((c) => c.isActive && hotelCostMatchesPeriod(c, selectedMonthKey))
     .reduce((sum, c) => sum + c.amount, 0);
   
-  const totalIncome = monthBookings.reduce((sum, b) => sum + b.income, 0);
+  const totalIncome = monthBookings.reduce((sum, b) => sum + (b.totalAmount ?? b.income), 0);
   const bookingExpenses = monthBookings.reduce(
     (sum, b) => sum + b.totals.totalOrderExpenses + b.extraExpenses,
     0
@@ -76,7 +76,7 @@ export function Dashboard() {
   const previousMonthBookings = bookings.filter((b) => b.monthKey === previousMonth);
   const previousMonthExpenses = expenses.filter((e) => e.monthKey === previousMonth);
   
-  const previousIncome = previousMonthBookings.reduce((sum, b) => sum + b.income, 0);
+  const previousIncome = previousMonthBookings.reduce((sum, b) => sum + (b.totalAmount ?? b.income), 0);
   const previousBookingExpenses = previousMonthBookings.reduce((sum, b) => sum + b.totals.totalOrderExpenses + b.extraExpenses, 0);
   const previousAdditionalExpenses = previousMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
   const previousExpenses = previousBookingExpenses + previousAdditionalExpenses + monthlyHotelCosts;
@@ -157,7 +157,7 @@ export function Dashboard() {
       const monthBookings = bookings.filter((b) => b.monthKey === monthKey);
       const monthExpenses = expenses.filter((e) => e.monthKey === monthKey);
       
-      const income = monthBookings.reduce((sum, b) => sum + b.income, 0);
+      const income = monthBookings.reduce((sum, b) => sum + (b.totalAmount ?? b.income), 0);
       const bookingExpenses = monthBookings.reduce((sum, b) => sum + b.totals.totalOrderExpenses + b.extraExpenses, 0);
       const additionalExpenses = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
       const totalExpenses = bookingExpenses + additionalExpenses + monthlyHotelCosts;
@@ -179,7 +179,7 @@ export function Dashboard() {
       const roomBookings = monthBookings.filter((b) => b.roomId === room.id);
       const roomExpenses = monthExpenses.filter((e) => e.roomId === room.id);
       
-      const income = roomBookings.reduce((sum, b) => sum + b.income, 0);
+      const income = roomBookings.reduce((sum, b) => sum + (b.totalAmount ?? b.income), 0);
       const bookingExpenses = roomBookings.reduce((sum, b) => sum + b.totals.totalOrderExpenses + b.extraExpenses, 0);
       const additionalExpenses = roomExpenses.reduce((sum, e) => sum + e.amount, 0);
       const expenses = bookingExpenses + additionalExpenses;
@@ -209,7 +209,7 @@ export function Dashboard() {
       const monthBookings = bookings.filter((b) => b.monthKey === monthKey);
       const monthExpenses = expenses.filter((e) => e.monthKey === monthKey);
       
-      const income = monthBookings.reduce((sum, b) => sum + b.income, 0);
+      const income = monthBookings.reduce((sum, b) => sum + (b.totalAmount ?? b.income), 0);
       const bookingExpenses = monthBookings.reduce((sum, b) => sum + b.totals.totalOrderExpenses + b.extraExpenses, 0);
       const additionalExpenses = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
       return income - (bookingExpenses + additionalExpenses + monthlyHotelCosts);
