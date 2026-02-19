@@ -18,13 +18,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Separator } from '../ui/separator';
 import { useAppStore } from '../../../store/useAppStore';
 import { calcNightsCount, calcIncome, calcSelectedCostTotal, createSelectedCostFromCatalog } from '../../../utils/calcEngine';
-import type { SelectedCost, Booking, Partner, PartnerReferral } from '../../../types/models';
+import type { SelectedCost, Booking } from '../../../types/models';
 import { ConfirmDeleteDialog } from '../shared/ConfirmDeleteDialog';
 import { BookingConflictDialog } from '../shared/BookingConflictDialog';
 import { UnsavedChangesConfirmDialog } from '../shared/UnsavedChangesConfirmDialog';
 import { Calendar } from '../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { CalendarIcon, AlertCircle, Edit2, ArrowRight, Users, Trash2, Plus } from 'lucide-react';
+import { CalendarIcon, AlertCircle, Edit2, ArrowRight, Trash2 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { toast } from 'sonner';
 
@@ -39,7 +39,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   const { t } = useTranslation();
   const rooms = useAppStore((state) => state.rooms);
   const costCatalog = useAppStore((state) => state.costCatalog);
-  const partners = useAppStore((state) => state.partners);
   const bookings = useAppStore((state) => state.bookings);
   const createBooking = useAppStore((state) => state.createBooking);
   const updateBooking = useAppStore((state) => state.updateBooking);
@@ -65,12 +64,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
     existingBooking?.selectedRoomCosts || []
   );
 
-  const [partnerReferrals, setPartnerReferrals] = useState<PartnerReferral[]>(
-    existingBooking?.partnerReferrals || []
-  );
-  const [selectedPartnerId, setSelectedPartnerId] = useState('');
-  const [referralGuests, setReferralGuests] = useState(1);
-
   const [currentBookingId, setCurrentBookingId] = useState(bookingId);
   const [viewMode, setViewMode] = useState<'list' | 'form'>(bookingId ? 'form' : 'list');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -80,7 +73,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   const [vatEnabled, setVatEnabled] = useState(false);
   const [snapshotVersion, setSnapshotVersion] = useState(0);
 
-  /** Snapshot of logical booking fields only (no derived/temporary/UI state). */
+  /** Snapshot of logical booking fields only (no derived/temporary/UI state). Partners excluded - not editable from this popup. */
   const getBookingSnapshot = (opts: {
     start: Date | undefined;
     end: Date | undefined;
@@ -88,7 +81,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
     extra: number;
     vat: boolean;
     roomCosts: SelectedCost[];
-    referrals: PartnerReferral[];
     cust: { customerName: string; customerEmail: string; customerPhone: string } | undefined;
   }) => ({
     check_in: opts.start ? format(opts.start, 'yyyy-MM-dd') : '',
@@ -99,9 +91,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
       ? (opts.vat ? calcIncome(calcNightsCount(format(opts.start, 'yyyy-MM-dd'), format(opts.end, 'yyyy-MM-dd')), opts.price) * 1.18 : calcIncome(calcNightsCount(format(opts.start, 'yyyy-MM-dd'), format(opts.end, 'yyyy-MM-dd')), opts.price))
       : 0,
     extra_expenses: opts.extra,
-    partner_referrals: opts.referrals
-      .map((r) => ({ partnerId: r.partnerId, guestsCount: r.guestsCount, date: r.date }))
-      .sort((a, b) => `${a.partnerId}-${a.date}`.localeCompare(`${b.partnerId}-${b.date}`)),
     room_costs: opts.roomCosts.map((c) => ({ id: c.catalogId, qty: c.qty })).sort((a, b) => a.id.localeCompare(b.id)),
     customer: opts.cust ? { customerName: opts.cust.customerName, customerEmail: opts.cust.customerEmail, customerPhone: opts.cust.customerPhone } : undefined,
   });
@@ -118,7 +107,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
           extra: extraExpenses,
           vat: vatEnabled,
           roomCosts: selectedRoomCosts,
-          referrals: partnerReferrals,
           cust: customerName || customerEmail || customerPhone ? { customerName, customerEmail, customerPhone } : undefined,
         })
       ),
@@ -130,7 +118,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
       extraExpenses,
       vatEnabled,
       selectedRoomCosts,
-      partnerReferrals,
       customerName,
       customerEmail,
       customerPhone,
@@ -140,7 +127,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   const isDirty = viewMode === 'form' && currentSnapshot !== initialSnapshotRef.current;
 
   const roomCosts = costCatalog.filter((c) => c.type === 'room' && c.isActive);
-  const activePartners = partners.filter((p) => p.isActive);
 
   const roomBookings = roomId ? bookings.filter((b) => b.roomId === roomId) : [];
 
@@ -158,7 +144,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         setCustomerEmail(booking.customer?.customerEmail || '');
         setCustomerPhone(booking.customer?.customerPhone || '');
         setSelectedRoomCosts(booking.selectedRoomCosts || []);
-        setPartnerReferrals(booking.partnerReferrals || []);
         setVatEnabled(booking.vatEnabled ?? false);
         setViewMode('form');
         initialSnapshotRef.current = JSON.stringify(getBookingSnapshot({
@@ -168,7 +153,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
           extra: booking.extraExpenses,
           vat: booking.vatEnabled ?? false,
           roomCosts: booking.selectedRoomCosts || [],
-          referrals: booking.partnerReferrals || [],
           cust: booking.customer ? { customerName: booking.customer.customerName || '', customerEmail: booking.customer.customerEmail || '', customerPhone: booking.customer.customerPhone || '' } : undefined,
         }));
       } else {
@@ -181,9 +165,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
         setCustomerEmail('');
         setCustomerPhone('');
         setSelectedRoomCosts([]);
-        setPartnerReferrals([]);
-        setSelectedPartnerId('');
-        setReferralGuests(1);
         setVatEnabled(false);
         setCurrentBookingId(undefined);
         setViewMode(initialRoomId && !bookingId ? 'list' : 'form');
@@ -194,7 +175,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
           extra: 0,
           vat: false,
           roomCosts: [],
-          referrals: [],
           cust: undefined,
         }));
       }
@@ -214,7 +194,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
   const nights = startDate && endDate ? calcNightsCount(format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd')) : 0;
   const income = calcIncome(nights, pricePerNight);
   const totalRoomCosts = selectedRoomCosts.reduce((sum, c) => sum + c.total, 0);
-  const totalPartnerRevenue = partnerReferrals.reduce((sum, r) => sum + r.commissionEarned, 0);
+  const totalPartnerRevenue = (currentBookingId ? bookings.find((b) => b.id === currentBookingId)?.partnerReferrals ?? [] : []).reduce((sum, r) => sum + r.commissionEarned, 0);
   const grossProfit = income - totalRoomCosts;
   const netProfit = grossProfit - extraExpenses + totalPartnerRevenue;
 
@@ -268,41 +248,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
     setSelectedRoomCosts(selectedRoomCosts.map(updateCost));
   };
 
-  const handleAddPartnerReferral = () => {
-    if (!selectedPartnerId || referralGuests <= 0) {
-      toast.error('נא לבחור שותף וכמות אורחים');
-      return;
-    }
-
-    const partner = partners.find((p) => p.id === selectedPartnerId);
-    if (!partner) return;
-
-    let commissionEarned = 0;
-    if (partner.commissionType === 'fixed') {
-      commissionEarned = partner.commissionValue * referralGuests;
-    } else {
-      commissionEarned = income * (partner.commissionValue / 100);
-    }
-
-    const newReferral: PartnerReferral = {
-      partnerId: partner.id,
-      partnerName: partner.name,
-      guestsCount: referralGuests,
-      commissionEarned,
-      date: startDate ? format(startDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-    };
-
-    setPartnerReferrals([...partnerReferrals, newReferral]);
-    setSelectedPartnerId('');
-    setReferralGuests(1);
-    toast.success('✅ הפניה נוספה!');
-  };
-
-  const handleRemovePartnerReferral = (index: number) => {
-    setPartnerReferrals(partnerReferrals.filter((_, i) => i !== index));
-    toast.success('✅ הפניה הוסרה!');
-  };
-
   const handleEditBooking = (booking: Booking) => {
     setCurrentBookingId(booking.id);
     setViewMode('form');
@@ -319,9 +264,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
     setCustomerEmail('');
     setCustomerPhone('');
     setSelectedRoomCosts([]);
-    setPartnerReferrals([]);
-    setSelectedPartnerId('');
-    setReferralGuests(1);
   };
 
   const handleCreateNew = () => {
@@ -335,9 +277,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
     setCustomerEmail('');
     setCustomerPhone('');
     setSelectedRoomCosts([]);
-    setPartnerReferrals([]);
-    setSelectedPartnerId('');
-    setReferralGuests(1);
   };
 
   const handleSave = async () => {
@@ -359,6 +298,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
       return;
     }
 
+    const currentBooking = currentBookingId ? bookings.find((b) => b.id === currentBookingId) : null;
     const bookingData = {
       roomId,
       startDate: format(startDate, 'yyyy-MM-dd'),
@@ -367,7 +307,7 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
       extraExpenses,
       selectedRoomCosts,
       selectedHotelCosts: [],
-      partnerReferrals,
+      partnerReferrals: currentBooking?.partnerReferrals ?? [],
       vatEnabled,
       customer: customerName || customerEmail || customerPhone
         ? { customerName, customerEmail, customerPhone }
@@ -745,93 +685,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
 
             <Separator className="bg-primary/30" />
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-foreground text-sm text-primary drop-shadow-[0_0_8px_rgba(124,255,58,0.5)] leading-tight">
-                  הפניות לשותפים עסקיים
-                </h4>
-                <Users className="w-4 h-4 text-primary flex-shrink-0" />
-              </div>
-
-              {activePartners.length === 0 ? (
-                <div className="glass-card border-primary/20 p-4 rounded-xl text-center">
-                  <p className="text-xs text-muted-foreground">אין שותפים עסקיים פעילים</p>
-                  <p className="text-xs text-muted-foreground mt-1">הוסף שותפים בעמוד "שותפים"</p>
-                </div>
-              ) : (
-                <>
-                  <div className="glass-card border-primary/20 p-3 rounded-xl bg-primary/5">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">בחר שותף</Label>
-                        <Select value={selectedPartnerId} onValueChange={setSelectedPartnerId}>
-                          <SelectTrigger className="glass-card border-primary/30 h-10">
-                            <SelectValue placeholder="בחר שותף" />
-                          </SelectTrigger>
-                          <SelectContent className="glass-card border-primary/30">
-                            {activePartners.map((partner) => (
-                              <SelectItem key={partner.id} value={partner.id}>
-                                {partner.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">כמות אורחים</Label>
-                        <Input
-                          type="number"
-                          value={referralGuests}
-                          onChange={(e) => setReferralGuests(Number(e.target.value))}
-                          min={1}
-                          className="glass-card border-primary/30 h-10"
-                        />
-                      </div>
-
-                      <div className="flex items-end">
-                        <GlowButton
-                          onClick={handleAddPartnerReferral}
-                          className="h-10 w-full"
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          הוסף הפניה
-                        </GlowButton>
-                      </div>
-                    </div>
-                  </div>
-
-                  {partnerReferrals.length > 0 && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-bold text-muted-foreground">הפניות שנבחרו:</p>
-                      {partnerReferrals.map((referral, index) => (
-                        <div
-                          key={index}
-                          className="glass-card border-primary/20 p-2.5 rounded-lg flex items-center justify-between gap-2 min-w-0"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate leading-tight" title={referral.partnerName}>{referral.partnerName}</p>
-                            <p className="text-xs text-muted-foreground leading-tight">{referral.guestsCount} אורחים</p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-sm font-bold text-primary whitespace-nowrap" dir="ltr">+₪{referral.commissionEarned.toFixed(2)}</span>
-                            <button
-                              onClick={() => handleRemovePartnerReferral(index)}
-                              className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <Separator className="bg-primary/30" />
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
               <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
                 <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.nights')}</p>
@@ -846,11 +699,6 @@ export function BookingDialog({ open, onClose, roomId: initialRoomId, bookingId 
               <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
                 <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">{t('booking.roomCosts')}</p>
                 <p className="text-lg font-bold text-destructive leading-none tracking-tight whitespace-nowrap truncate w-full text-center" dir="ltr">-₪{Number(totalRoomCosts).toFixed(2)}</p>
-              </div>
-
-              <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
-                <p className="text-muted-foreground text-xs leading-tight tracking-wide opacity-80 whitespace-nowrap shrink-0">הכנסות משותפים</p>
-                <p className="text-lg font-bold text-primary leading-none tracking-tight whitespace-nowrap truncate w-full text-center" dir="ltr">+₪{Number(totalPartnerRevenue).toFixed(2)}</p>
               </div>
 
               <div className="glass-card border-primary/30 p-3 sm:p-4 rounded-2xl overflow-hidden min-w-0 w-full min-h-[80px] flex flex-col items-center justify-center text-center gap-0.5">
