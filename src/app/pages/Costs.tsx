@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '../components/layout/PageHeader';
 import { MonthSelector } from '../components/shared/MonthSelector';
@@ -24,6 +24,7 @@ import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 import type { HotelCost, CostCatalogItem } from '../../types/models';
+import { DEFAULT_ROOM_COSTS } from '../../data/defaultRoomCosts';
 import { hotelCostMatchesPeriod, getPeriodKeyFromMonth, FREQUENCY_LABELS } from '../../utils/periodUtils';
 import type { HotelCostFrequency } from '../../types/models';
 
@@ -94,9 +95,16 @@ export function Costs() {
   const [hotelCostDialogDirty, setHotelCostDialogDirty] = useState(false);
   const [hotelCostConfirmOpen, setHotelCostConfirmOpen] = useState(false);
 
-  const roomCosts = costCatalog.filter(
+  const roomCosts = (costCatalog.length > 0 ? costCatalog : DEFAULT_ROOM_COSTS).filter(
     (c) => c.type === 'room'
-  );  
+  );
+
+  useEffect(() => {
+    if (costCatalog.length === 0 && rooms.length > 0) {
+      useAppStore.setState({ costCatalog: DEFAULT_ROOM_COSTS });
+      useAppStore.getState().storage?.saveState?.(useAppStore.getState());
+    }
+  }, [costCatalog.length, rooms.length]);  
   const totalMonthlyHotelCosts = hotelCostsForPeriod
     .filter((c) => c.isActive)
     .reduce((sum, c) => sum + c.amount, 0);
