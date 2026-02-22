@@ -5,6 +5,7 @@
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { AppState, CostCatalogItem, Booking } from '../types/models';
+import { DEFAULT_ROOM_COSTS } from '../data/defaultRoomCosts';
 import {
   roomFromRow,
   bookingFromRow,
@@ -249,10 +250,19 @@ export async function loadState(): Promise<AppState> {
 
     const rooms = (roomsData.data ?? []).map((r) => roomFromRow(r as Record<string, unknown>));
     const bookings = (incomeData.data ?? []).map((r) => bookingFromRow(r as Record<string, unknown>));
-    const roomFinancials = (roomFinancialsData.data ?? []) as Record<string, unknown>[];
-    const costCatalog = roomFinancials
+    let roomFinancials = (roomFinancialsData.data ?? []) as Record<string, unknown>[];
+    let costCatalog = roomFinancials
       .filter((r) => (r.entity_type ?? r.entityType) === ENTITY_COST_CATALOG)
       .map((r) => costCatalogFromRow(r));
+
+    if (costCatalog.length === 0 && rooms.length > 0 && rooms[0]?.id) {
+      await seedDefaultRoomCosts(userId, rooms[0].id);
+      const { data: refetched } = await supabase.from(ROOM_FINANCIALS).select('*').eq('user_id', userId);
+      roomFinancials = (refetched ?? []) as Record<string, unknown>[];
+      costCatalog = roomFinancials
+        .filter((r) => (r.entity_type ?? r.entityType) === ENTITY_COST_CATALOG)
+        .map((r) => costCatalogFromRow(r));
+    }
     const hotelCosts = (hotelCostsData.data ?? []).map((r) => hotelCostFromRow(r as Record<string, unknown>));
     const partners = (partnersData.data ?? []).map((r) => partnerFromRow(r as Record<string, unknown>));
     const manualReferrals = (transactionsData.data ?? [])
@@ -284,6 +294,29 @@ export async function loadState(): Promise<AppState> {
     console.error('[supabaseSync] loadState failed:', err);
     throw err;
   }
+}
+
+/**
+ * Seed default room cost items when user has zero cost_catalog rows.
+ * Uses upsert with onConflict (user_id, room_id, label) to avoid duplicates.
+ * Only operates on the given userId; requires at least one room.
+ */
+async function seedDefaultRoomCosts(userId: string, roomId: string): Promise<void> {
+  const rows: Record<string, unknown>[] = DEFAULT_ROOM_COSTS.map((m) => {
+    const row = roomFinancialsRowForDb(
+      {
+        ...toSnake(costCatalogToRow(m) as Record<string, unknown>),
+        entity_type: ENTITY_COST_CATALOG,
+        user_id: userId,
+        amount: 0,
+      },
+      ENTITY_COST_CATALOG,
+      m.id,
+      roomId
+    );
+    return sanitizeRow(ROOM_FINANCIALS, row as Record<string, unknown>);
+  });
+  await saveEntity(ROOM_FINANCIALS, rows, 'user_id,room_id,label');
 }
 
 /**
@@ -518,7 +551,7 @@ export async function saveState(state: AppState): Promise<void> {
       },
     },
     { name: INCOME_RECORDS, run: () => saveEntity(INCOME_RECORDS, bookingRows, 'id') },
-    { name: ROOM_FINANCIALS, run: () => saveEntity(ROOM_FINANCIALS, roomFinancialsRows, 'id') },
+    { name: ROOM_FINANCIALS, run: () => saveEntity(ROOM_FINANCIALS, roomFinancialsRows, 'user_id,room_id,label') },
     { name: HOTEL_COSTS, run: () => saveEntity(HOTEL_COSTS, hotelCostRows, 'id') },
     { name: PARTNERS, run: () => saveEntity(PARTNERS, partnerRows, 'id') },
     { name: TRANSACTIONS, run: () => saveEntity(TRANSACTIONS, transactionRows, 'id') },
